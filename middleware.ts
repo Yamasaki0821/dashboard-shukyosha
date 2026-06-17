@@ -8,7 +8,6 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/actuals") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {
