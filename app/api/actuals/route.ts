@@ -156,7 +156,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const feeByCategory: Record<string, number> = {};
       for (const [k, v] of catMap.entries()) feeByCategory[k] = v;
 
-      return NextResponse.json({ monthly, totalFee, totalCount, budgetTotal, feeByRate, feeByCategory });
+      // 葬儀のみの件数・手数料（Kintone 4〜6月）
+      const funeralRecs = kRecs.filter(r => r.category === "葬儀");
+      const funeralCount = funeralRecs.length;
+      const funeralFee   = Math.round(funeralRecs.reduce((s, r) => s + r.fee, 0) / 1000);
+
+      return NextResponse.json({ monthly, totalFee, totalCount, budgetTotal, feeByRate, feeByCategory, funeralCount, funeralFee });
     }
 
     // ── hall ──────────────────────────────────────────────────────

@@ -20,6 +20,8 @@ interface SummaryData {
   budgetTotal: number;
   feeByRate: { rate30: number; rate40: number };
   feeByCategory: Record<string, number>;
+  funeralCount: number;
+  funeralFee: number;
 }
 
 // ── 共通スタイル ─────────────────────────────────────────────────
@@ -106,12 +108,14 @@ function MonthlyBarChart({ data }: { data: MonthlyRow[] }) {
             data: fee30,
             backgroundColor: "#ce93d8",
             stack: "fee",
+            order: 2,
           },
           {
             label: "40%手数料",
             data: fee40,
             backgroundColor: PURPLE,
             stack: "fee",
+            order: 2,
           },
           {
             label: "予算",
@@ -119,10 +123,12 @@ function MonthlyBarChart({ data }: { data: MonthlyRow[] }) {
             type: "line",
             borderColor: "#fbbc04",
             backgroundColor: "transparent",
-            borderWidth: 2,
-            pointRadius: 3,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointBackgroundColor: "#fbbc04",
             tension: 0,
-            order: 0,
+            order: 1,
+            z: 10,
           },
         ],
       },
@@ -189,51 +195,6 @@ function DonutChart({ rate30, rate40 }: { rate30: number; rate40: number }) {
   return <canvas ref={canvasRef} style={{ maxHeight: 260 }} />;
 }
 
-// ── 区分別バーチャート ────────────────────────────────────────────
-function CategoryBarChart({ data }: { data: Record<string, number> }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef  = useRef<any>(null);
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const w = window as any;
-    if (!w.Chart) return;
-    if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
-
-    const entries = Object.entries(data).sort(([,a],[,b]) => b - a);
-    const COLORS = ["#6a2d8f","#9c4fbe","#ce93d8","#34a853","#fbbc04","#ea4335"];
-
-    chartRef.current = new w.Chart(canvasRef.current, {
-      type: "bar",
-      data: {
-        labels: entries.map(([k]) => k),
-        datasets: [{
-          label: "手数料（千円）",
-          data: entries.map(([,v]) => v),
-          backgroundColor: entries.map((_, i) => COLORS[i % COLORS.length]),
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        indexAxis: "y" as const,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx: any) => `${ctx.parsed.x.toLocaleString()}千円`,
-            },
-          },
-        },
-        scales: {
-          x: { ticks: { callback: (v: number) => `${v.toLocaleString()}` } },
-        },
-      },
-    });
-  }, [data]);
-
-  return <canvas ref={canvasRef} style={{ maxHeight: 220 }} />;
-}
 
 // ── メインページ ─────────────────────────────────────────────────
 export default function SummaryPage() {
@@ -301,23 +262,26 @@ export default function SummaryPage() {
             {/* KPI カード */}
             <div className="kpi-grid" style={{ marginBottom: 20 }}>
               <KPICard
-                label="累計手数料（千円）"
+                label="累計手数料合計（千円）"
                 value={data.totalFee.toLocaleString()}
-                sub={`予算: ${data.budgetTotal.toLocaleString()}千円`}
+                sub={`累計予算: ${data.budgetTotal.toLocaleString()}千円`}
                 color={PURPLE}
               />
               <KPICard
-                label="予算達成率"
+                label="累計予算達成率"
                 value={`${achieveRate}%`}
+                sub="10月〜当月累計"
                 color={achieveRate >= 100 ? "#34a853" : achieveRate >= 80 ? "#fbbc04" : "#ea4335"}
               />
               <KPICard
-                label="累計件数"
+                label="累計件数（全区分）"
                 value={`${data.totalCount.toLocaleString()}件`}
+                sub="葬儀＋法要"
               />
               <KPICard
                 label="平均手数料単価（千円）"
-                value={data.totalCount > 0 ? Math.round(data.totalFee / data.totalCount).toLocaleString() : "—"}
+                value={data.funeralCount > 0 ? Math.round(data.funeralFee / data.funeralCount).toLocaleString() : "—"}
+                sub={`葬儀のみ対象（4〜6月 ${data.funeralCount}件）`}
               />
             </div>
 
@@ -335,41 +299,8 @@ export default function SummaryPage() {
               )}
             </div>
 
-            <div className="grid-2col" style={{ marginBottom: 20 }}>
-              {/* 手数料率構成ドーナツ */}
-              <div style={card}>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>手数料率構成（累計）</div>
-                {chartReady ? (
-                  <div style={{ height: 260 }}>
-                    <DonutChart rate30={data.feeByRate.rate30} rate40={data.feeByRate.rate40} />
-                  </div>
-                ) : (
-                  <div style={{ height: 260, display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>読み込み中...</div>
-                )}
-                <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 13, color: "#5f6368" }}>
-                  <span>30%: {data.feeByRate.rate30.toLocaleString()}千円</span>
-                  <span>40%: {data.feeByRate.rate40.toLocaleString()}千円</span>
-                </div>
-              </div>
-
-              {/* 区分別（葬儀/法要）*/}
-              <div style={card}>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>葬法区分別手数料（4〜6月）</div>
-                <div style={{ fontSize: 11, color: "#80868b", marginBottom: 12 }}>※ Kintone連携データのみ（4〜6月実績）</div>
-                {Object.keys(data.feeByCategory).length === 0 ? (
-                  <p style={{ color: "#888", fontSize: 13 }}>Kintoneデータなし</p>
-                ) : chartReady ? (
-                  <div style={{ height: 220 }}>
-                    <CategoryBarChart data={data.feeByCategory} />
-                  </div>
-                ) : (
-                  <div style={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>読み込み中...</div>
-                )}
-              </div>
-            </div>
-
-            {/* 月別テーブル */}
-            <div style={card}>
+            {/* 月別詳細テーブル */}
+            <div style={{ ...card, marginBottom: 20 }}>
               <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>月別詳細</div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -415,6 +346,67 @@ export default function SummaryPage() {
                     </tr>
                   </tfoot>
                 </table>
+              </div>
+            </div>
+
+            <div className="grid-2col" style={{ marginBottom: 20 }}>
+              {/* 手数料率構成ドーナツ */}
+              <div style={card}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>手数料率構成（累計）</div>
+                {chartReady ? (
+                  <div style={{ height: 260 }}>
+                    <DonutChart rate30={data.feeByRate.rate30} rate40={data.feeByRate.rate40} />
+                  </div>
+                ) : (
+                  <div style={{ height: 260, display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>読み込み中...</div>
+                )}
+                <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 13, color: "#5f6368" }}>
+                  <span>30%: {data.feeByRate.rate30.toLocaleString()}千円</span>
+                  <span>40%: {data.feeByRate.rate40.toLocaleString()}千円</span>
+                </div>
+              </div>
+
+              {/* 区分別（葬儀/法要）— 表示形式 */}
+              <div style={card}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>葬法区分別手数料（4〜6月）</div>
+                <div style={{ fontSize: 11, color: "#80868b", marginBottom: 16 }}>※ Kintone連携データのみ（4〜6月実績）</div>
+                {Object.keys(data.feeByCategory).length === 0 ? (
+                  <p style={{ color: "#888", fontSize: 13 }}>Kintoneデータなし</p>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead>
+                      <tr style={{ background: "#f8f9fa" }}>
+                        <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#5f6368", borderBottom: "1px solid #e0e0e0" }}>区分</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: "#5f6368", borderBottom: "1px solid #e0e0e0" }}>手数料（千円）</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: "#5f6368", borderBottom: "1px solid #e0e0e0" }}>構成比</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const entries = Object.entries(data.feeByCategory).sort(([,a],[,b]) => b - a);
+                        const catTotal = entries.reduce((s,[,v]) => s + v, 0);
+                        return entries.map(([name, fee]) => (
+                          <tr key={name} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                            <td style={{ padding: "12px", fontWeight: 500 }}>{name}</td>
+                            <td style={{ padding: "12px", textAlign: "right", fontWeight: 700, color: PURPLE }}>{fee.toLocaleString()}</td>
+                            <td style={{ padding: "12px", textAlign: "right", color: "#5f6368" }}>
+                              {catTotal > 0 ? `${Math.round(fee / catTotal * 100)}%` : "—"}
+                            </td>
+                          </tr>
+                        ));
+                      })()}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: "#f3e5f5", fontWeight: 700 }}>
+                        <td style={{ padding: "10px 12px" }}>合計</td>
+                        <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                          {Object.values(data.feeByCategory).reduce((s,v) => s+v, 0).toLocaleString()}
+                        </td>
+                        <td style={{ padding: "10px 12px", textAlign: "right" }}>100%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                )}
               </div>
             </div>
           </>
