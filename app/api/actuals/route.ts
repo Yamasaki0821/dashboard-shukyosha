@@ -18,6 +18,9 @@ const BUDGET: Record<string, number> = {
   "2026-04": 18709,
   "2026-05": 17336,
   "2026-06": 15923,
+  "2026-07": 17101,
+  "2026-08": 15229,
+  "2026-09": 15747,
 };
 
 // ── CSV パーサー（シンプル） ────────────────────────────────────
@@ -55,7 +58,7 @@ function csvMonthToYM(month: string): string | null {
 }
 
 // ── Kintone クエリ ───────────────────────────────────────────────
-const KINTONE_QUERY = '葬儀日_法要日 >= "2026-04-01" and 葬儀日_法要日 <= "2026-06-30"';
+const KINTONE_QUERY = '葬儀日_法要日 >= "2026-04-01" and 葬儀日_法要日 <= "2026-09-30"';
 
 // ── メイン GET ───────────────────────────────────────────────────
 export async function GET(req: NextRequest): Promise<NextResponse> {
