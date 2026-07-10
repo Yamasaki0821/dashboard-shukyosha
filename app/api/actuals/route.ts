@@ -199,18 +199,43 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         .sort(([,a],[,b]) => b.fee - a.fee)
         .map(([name, v]) => ({ name, fee: v.fee, donation: v.donation, count: v.count, hasKintone: v.hasKintone }));
 
-      // 事業部別（Kintone のみ）
-      const divMap = aggregateBy(kRecs, r => r.division);
       // 支社別（Kintone のみ）
-      const brMap  = aggregateBy(kRecs, r => r.branch);
-      // エリア別（Kintone のみ）
-      const areaMap = aggregateBy(kRecs, r => r.area);
+      const brMap = aggregateBy(kRecs, r => r.branch);
+
+      // エリア別 月別マトリクス（Kintone のみ・4月〜9月）
+      // { name, monthly: { "2026-04": { fee, donation, count }, ... }, total: {...} }
+      const areaMonthly = new Map<string, {
+        monthly: Record<string, { fee: number; donation: number; count: number }>;
+        total: { fee: number; donation: number; count: number };
+      }>();
+      for (const r of kRecs) {
+        const name = r.area || "未入力";
+        const ym = r.yearMonth;
+        const e = areaMonthly.get(name) ?? {
+          monthly: {},
+          total: { fee: 0, donation: 0, count: 0 },
+        };
+        const feeK = Math.round(r.fee / 1000);
+        const donK = Math.round(r.donation / 1000);
+        if (ym) {
+          const mm = e.monthly[ym] ?? { fee: 0, donation: 0, count: 0 };
+          mm.fee += feeK; mm.donation += donK; mm.count += 1;
+          e.monthly[ym] = mm;
+        }
+        e.total.fee += feeK; e.total.donation += donK; e.total.count += 1;
+        areaMonthly.set(name, e);
+      }
+      const byAreaMonthly = Array.from(areaMonthly.entries())
+        .sort(([,a],[,b]) => b.total.fee - a.total.fee)
+        .map(([name, v]) => ({ name, monthly: v.monthly, total: v.total }));
+
+      const kintoneMonths = MONTHS_ORDER.filter(m => m >= "2026-04");
 
       return NextResponse.json({
         byHall,
-        byDivision: mapToArray(divMap),
-        byBranch:   mapToArray(brMap),
-        byArea:     mapToArray(areaMap),
+        byBranch: mapToArray(brMap),
+        byAreaMonthly,
+        kintoneMonths,
       });
     }
 

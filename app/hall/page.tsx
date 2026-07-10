@@ -4,14 +4,28 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TopBar, PageHeader } from "../../components/Shell";
 
-interface Row { name: string; fee: number; donation: number; count: number; hasKintone?: boolean; }
-interface HallData {
-  byHall: Row[];
-  byDivision: Row[];
-  byBranch: Row[];
-  byArea: Row[];
+interface Row { name: string; fee: number; donation: number; count: number; }
+
+interface MonthlyCell { fee: number; donation: number; count: number; }
+interface AreaMonthlyRow {
+  name: string;
+  monthly: Record<string, MonthlyCell>;
+  total: MonthlyCell;
 }
 
+interface HallData {
+  byHall: Row[];
+  byBranch: Row[];
+  byAreaMonthly: AreaMonthlyRow[];
+  kintoneMonths: string[];
+}
+
+const MONTH_LABELS: Record<string, string> = {
+  "2026-04": "4月", "2026-05": "5月", "2026-06": "6月",
+  "2026-07": "7月", "2026-08": "8月", "2026-09": "9月",
+};
+
+// 通常のテーブル（支社別・会館別）
 function Table({ rows, label, showDonation }: { rows: Row[]; label: string; showDonation: boolean }) {
   const totalFee      = rows.reduce((s, r) => s + r.fee, 0);
   const totalDonation = rows.reduce((s, r) => s + r.donation, 0);
@@ -69,6 +83,54 @@ function Table({ rows, label, showDonation }: { rows: Row[]; label: string; show
   );
 }
 
+// エリア別 月別マトリクス（お布施額・手数料を月ごとに）
+function AreaMatrix({ rows, months, metric }: { rows: AreaMonthlyRow[]; months: string[]; metric: "fee" | "donation" }) {
+  const monthTotals: Record<string, number> = {};
+  months.forEach(m => {
+    monthTotals[m] = rows.reduce((s, r) => s + (r.monthly[m]?.[metric] ?? 0), 0);
+  });
+  const grandTotal = rows.reduce((s, r) => s + r.total[metric], 0);
+  return (
+    <table className="data-table">
+      <thead>
+        <tr>
+          <th>順位</th>
+          <th>エリア名</th>
+          {months.map(m => <th key={m}>{MONTH_LABELS[m] ?? m}</th>)}
+          <th>合計</th>
+          <th>件数</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={`${r.name}-${i}`}>
+            <td style={{ color: "var(--color-text-muted)" }}>{i + 1}</td>
+            <td style={{ fontWeight: i < 3 ? 700 : 500 }}>{r.name}</td>
+            {months.map(m => {
+              const v = r.monthly[m]?.[metric] ?? 0;
+              return (
+                <td key={m} style={{ color: v === 0 ? "var(--color-text-muted)" : "var(--color-text)" }}>
+                  {v === 0 ? "—" : v.toLocaleString()}
+                </td>
+              );
+            })}
+            <td style={{ fontWeight: 700 }}>{r.total[metric].toLocaleString()}</td>
+            <td>{r.total.count.toLocaleString()}</td>
+          </tr>
+        ))}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colSpan={2}>合計</td>
+          {months.map(m => <td key={m}>{monthTotals[m].toLocaleString()}</td>)}
+          <td>{grandTotal.toLocaleString()}</td>
+          <td>{rows.reduce((s, r) => s + r.total.count, 0).toLocaleString()}</td>
+        </tr>
+      </tfoot>
+    </table>
+  );
+}
+
 export default function HallPage() {
   const [data, setData]       = useState<HallData | null>(null);
   const [error, setError]     = useState("");
@@ -108,24 +170,24 @@ export default function HallPage() {
               </div>
             )}
 
-            {/* 事業部別 */}
-            {data.byDivision.length > 0 && (
+            {/* エリア別 月別マトリクス（お布施額） */}
+            {data.byAreaMonthly.length > 0 && (
               <div className="card" style={{ marginBottom: 20 }}>
-                <div className="card-title">事業部別（お布施額・手数料）</div>
-                <div className="card-subtitle">Kintone連携データ（4月〜9月）</div>
+                <div className="card-title">エリア別 月別 お布施額</div>
+                <div className="card-subtitle">Kintone連携データ（4月〜9月）　／　単位：千円</div>
                 <div style={{ overflowX: "auto" }}>
-                  <Table rows={data.byDivision} label="事業部名" showDonation />
+                  <AreaMatrix rows={data.byAreaMonthly} months={data.kintoneMonths} metric="donation" />
                 </div>
               </div>
             )}
 
-            {/* エリア別 */}
-            {data.byArea.length > 0 && (
+            {/* エリア別 月別マトリクス（手数料） */}
+            {data.byAreaMonthly.length > 0 && (
               <div className="card" style={{ marginBottom: 20 }}>
-                <div className="card-title">エリア別（お布施額・手数料）</div>
-                <div className="card-subtitle">Kintone連携データ（4月〜9月）</div>
+                <div className="card-title">エリア別 月別 手数料</div>
+                <div className="card-subtitle">Kintone連携データ（4月〜9月）　／　単位：千円</div>
                 <div style={{ overflowX: "auto" }}>
-                  <Table rows={data.byArea} label="エリア名" showDonation />
+                  <AreaMatrix rows={data.byAreaMonthly} months={data.kintoneMonths} metric="fee" />
                 </div>
               </div>
             )}
