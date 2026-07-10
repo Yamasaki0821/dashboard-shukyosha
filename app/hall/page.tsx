@@ -1,94 +1,67 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TopBar, PageHeader } from "../../components/Shell";
 
-interface HallRow { name: string; fee: number; count: number; }
+interface Row { name: string; fee: number; donation: number; count: number; hasKintone?: boolean; }
 interface HallData {
-  byHall: HallRow[];
-  byDivision: HallRow[];
+  byHall: Row[];
+  byDivision: Row[];
+  byBranch: Row[];
+  byArea: Row[];
 }
 
-function HorizontalBar({ data }: { data: HallRow[] }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef  = useRef<any>(null);
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const w = window as any;
-    if (!w.Chart) return;
-    if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
-
-    const top = data.slice(0, 20);
-    // アンバー濃淡（テーマカラー）
-    const baseColor = "#fbbc04";
-
-    chartRef.current = new w.Chart(canvasRef.current, {
-      type: "bar",
-      data: {
-        labels: top.map(d => d.name),
-        datasets: [{
-          label: "手数料（千円）",
-          data: top.map(d => d.fee),
-          backgroundColor: baseColor,
-          borderRadius: 4,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        indexAxis: "y" as const,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx: any) => `${ctx.parsed.x.toLocaleString()}千円 / ${top[ctx.dataIndex].count}件`,
-            },
-          },
-        },
-        scales: {
-          x: { ticks: { callback: (v: number) => v.toLocaleString() }, grid: { color: "rgba(0,0,0,0.05)" } },
-          y: { grid: { display: false } },
-        },
-      },
-    });
-  }, [data]);
-
-  return <canvas ref={canvasRef} />;
-}
-
-function RankTable({ rows, label }: { rows: HallRow[]; label: string }) {
-  const total = rows.reduce((s, r) => s + r.fee, 0);
+function Table({ rows, label, showDonation }: { rows: Row[]; label: string; showDonation: boolean }) {
+  const totalFee      = rows.reduce((s, r) => s + r.fee, 0);
+  const totalDonation = rows.reduce((s, r) => s + r.donation, 0);
+  const totalCount    = rows.reduce((s, r) => s + r.count, 0);
   return (
     <table className="data-table">
       <thead>
         <tr>
           <th>順位</th>
           <th>{label}</th>
+          {showDonation && <th>お布施額（千円）</th>}
           <th>手数料（千円）</th>
           <th>件数</th>
-          <th>構成比</th>
+          {showDonation && <th>実質手数料率</th>}
+          <th>手数料構成比</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((r, i) => (
-          <tr key={`${r.name}-${i}`}>
-            <td style={{ color: "var(--color-text-muted)" }}>{i + 1}</td>
-            <td style={{ fontWeight: i < 3 ? 700 : 500 }}>{r.name}</td>
-            <td style={{ fontWeight: 700 }}>{r.fee.toLocaleString()}</td>
-            <td>{r.count.toLocaleString()}</td>
-            <td style={{ color: "var(--color-text-sub)" }}>
-              {total > 0 ? `${(r.fee / total * 100).toFixed(1)}%` : "—"}
-            </td>
-          </tr>
-        ))}
+        {rows.map((r, i) => {
+          const realRate = r.donation > 0 ? (r.fee / r.donation * 100) : 0;
+          return (
+            <tr key={`${r.name}-${i}`}>
+              <td style={{ color: "var(--color-text-muted)" }}>{i + 1}</td>
+              <td style={{ fontWeight: i < 3 ? 700 : 500 }}>{r.name}</td>
+              {showDonation && (
+                <td style={{ color: r.donation > 0 ? "var(--color-text)" : "var(--color-text-muted)" }}>
+                  {r.donation > 0 ? r.donation.toLocaleString() : "—"}
+                </td>
+              )}
+              <td style={{ fontWeight: 700 }}>{r.fee.toLocaleString()}</td>
+              <td>{r.count.toLocaleString()}</td>
+              {showDonation && (
+                <td style={{ color: "var(--color-text-sub)" }}>
+                  {realRate > 0 ? `${realRate.toFixed(1)}%` : "—"}
+                </td>
+              )}
+              <td style={{ color: "var(--color-text-sub)" }}>
+                {totalFee > 0 ? `${(r.fee / totalFee * 100).toFixed(1)}%` : "—"}
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
       <tfoot>
         <tr>
           <td colSpan={2}>合計</td>
-          <td>{total.toLocaleString()}</td>
-          <td>{rows.reduce((s, r) => s + r.count, 0).toLocaleString()}</td>
+          {showDonation && <td>{totalDonation.toLocaleString()}</td>}
+          <td>{totalFee.toLocaleString()}</td>
+          <td>{totalCount.toLocaleString()}</td>
+          {showDonation && <td>—</td>}
           <td>100%</td>
         </tr>
       </tfoot>
@@ -100,16 +73,7 @@ export default function HallPage() {
   const [data, setData]       = useState<HallData | null>(null);
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(true);
-  const [chartReady, setChartReady] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    if ((window as any).Chart) { setChartReady(true); return; }
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js";
-    s.onload = () => setChartReady(true);
-    document.head.appendChild(s);
-  }, []);
 
   useEffect(() => {
     fetch("/api/actuals?type=hall")
@@ -133,45 +97,47 @@ export default function HallPage() {
 
         {data && (
           <>
-            {/* 事業部別 */}
-            <div className="card" style={{ marginBottom: 20 }}>
-              <div className="card-title">事業部別手数料</div>
-              <div className="card-subtitle">
-                ※ Kintone連携データのみ（4〜6月実績）。10〜3月のExcelデータには事業部情報が含まれていません。
+            {/* 支社別 */}
+            {data.byBranch.length > 0 && (
+              <div className="card" style={{ marginBottom: 20 }}>
+                <div className="card-title">支社別（お布施額・手数料）</div>
+                <div className="card-subtitle">Kintone連携データ（4月〜9月）</div>
+                <div style={{ overflowX: "auto" }}>
+                  <Table rows={data.byBranch} label="支社名" showDonation />
+                </div>
               </div>
-              {data.byDivision.length === 0 ? (
-                <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>データなし（Kintone未接続またはデータ0件）</p>
-              ) : (
-                <>
-                  {chartReady ? (
-                    <div style={{ height: Math.max(200, data.byDivision.length * 40) }}>
-                      <HorizontalBar data={data.byDivision} />
-                    </div>
-                  ) : (
-                    <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)" }}>読み込み中...</div>
-                  )}
-                  <div style={{ marginTop: 16, overflowX: "auto" }}>
-                    <RankTable rows={data.byDivision} label="事業部" />
-                  </div>
-                </>
-              )}
-            </div>
+            )}
+
+            {/* 事業部別 */}
+            {data.byDivision.length > 0 && (
+              <div className="card" style={{ marginBottom: 20 }}>
+                <div className="card-title">事業部別（お布施額・手数料）</div>
+                <div className="card-subtitle">Kintone連携データ（4月〜9月）</div>
+                <div style={{ overflowX: "auto" }}>
+                  <Table rows={data.byDivision} label="事業部名" showDonation />
+                </div>
+              </div>
+            )}
+
+            {/* エリア別 */}
+            {data.byArea.length > 0 && (
+              <div className="card" style={{ marginBottom: 20 }}>
+                <div className="card-title">エリア別（お布施額・手数料）</div>
+                <div className="card-subtitle">Kintone連携データ（4月〜9月）</div>
+                <div style={{ overflowX: "auto" }}>
+                  <Table rows={data.byArea} label="エリア名" showDonation />
+                </div>
+              </div>
+            )}
 
             {/* 会館別 */}
             <div className="card">
-              <div className="card-title">会館別手数料（累計）</div>
+              <div className="card-title">会館別（お布施額・手数料）</div>
               <div className="card-subtitle">
-                10〜3月（Excel）+ 4〜6月（Kintone）の合算　／　上位20会館を表示
+                10月〜3月（Excel・手数料のみ）+ 4月〜9月（Kintone・お布施額含む）　／　手数料順で全会館表示
               </div>
-              {chartReady ? (
-                <div style={{ height: Math.min(800, Math.max(400, Math.min(data.byHall.length, 20) * 32)) }}>
-                  <HorizontalBar data={data.byHall} />
-                </div>
-              ) : (
-                <div style={{ height: 400, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)" }}>読み込み中...</div>
-              )}
-              <div style={{ marginTop: 20, overflowX: "auto" }}>
-                <RankTable rows={data.byHall} label="会館名" />
+              <div style={{ overflowX: "auto" }}>
+                <Table rows={data.byHall} label="会館名" showDonation />
               </div>
             </div>
           </>

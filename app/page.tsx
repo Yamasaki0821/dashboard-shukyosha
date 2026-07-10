@@ -9,6 +9,7 @@ interface MonthlyRow {
   fee30: number;
   fee40: number;
   total: number;
+  donation: number | null;
   count: number;
   budget: number;
 }
@@ -16,6 +17,7 @@ interface MonthlyRow {
 interface SummaryData {
   monthly: MonthlyRow[];
   totalFee: number;
+  totalDonation: number;
   totalCount: number;
   budgetTotal: number;
   feeByRate: { rate30: number; rate40: number };
@@ -266,16 +268,17 @@ export default function SummaryPage() {
 
             {/* 月別詳細テーブル */}
             <div className="card" style={{ marginBottom: 20 }}>
-              <div className="card-title">月別詳細</div>
-              <div className="card-subtitle">単位：千円　／　達成率の色：90%↑緑・70-89%黄・70%未満赤</div>
+              <div className="card-title">月別詳細（10月〜9月・第30期）</div>
+              <div className="card-subtitle">単位：千円　／　お布施額は4月以降Kintone連携のみ　／　達成率：90%↑緑・70-89%黄・70%未満赤</div>
               <div style={{ overflowX: "auto" }}>
                 <table className="data-table">
                   <thead>
                     <tr>
                       <th>月</th>
+                      <th>お布施額</th>
                       <th>30%手数料</th>
                       <th>40%手数料</th>
-                      <th>合計</th>
+                      <th>手数料合計</th>
                       <th>予算</th>
                       <th>達成率</th>
                       <th>件数</th>
@@ -291,6 +294,9 @@ export default function SummaryPage() {
                             {MONTH_LABELS[m.month] ?? m.month}
                             {isKintone && <span className="badge badge-kintone">Kintone</span>}
                           </td>
+                          <td style={{ color: m.donation === null ? "var(--color-text-muted)" : "var(--color-text)" }}>
+                            {m.donation === null ? "—" : m.donation.toLocaleString()}
+                          </td>
                           <td>{m.fee30.toLocaleString()}</td>
                           <td>{m.fee40.toLocaleString()}</td>
                           <td style={{ fontWeight: 700 }}>{m.total.toLocaleString()}</td>
@@ -304,6 +310,7 @@ export default function SummaryPage() {
                   <tfoot>
                     <tr>
                       <td>合計</td>
+                      <td>{data.totalDonation.toLocaleString()}</td>
                       <td>{data.feeByRate.rate30.toLocaleString()}</td>
                       <td>{data.feeByRate.rate40.toLocaleString()}</td>
                       <td>{data.totalFee.toLocaleString()}</td>
