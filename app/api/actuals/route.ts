@@ -61,6 +61,18 @@ function csvMonthToYM(month: string): string | null {
 // ── Kintone クエリ ───────────────────────────────────────────────
 const KINTONE_QUERY = '葬儀日_法要日 >= "2026-04-01" and 葬儀日_法要日 <= "2026-09-30"';
 
+// ── 文字化けレコードの補正マップ ────────────────────────────
+// U+FFFDを含む値を正しい値に置換
+// 参照元マスターの化けが原因（レコード517=エリア名, 311/169=事業部名）
+function normalizeArea(s: string): string {
+  if (s && s.includes("�")) return "名古屋２エリア";
+  return s;
+}
+function normalizeDivision(s: string): string {
+  if (s && s.includes("�")) return "東海第１事業部";
+  return s;
+}
+
 // ── メイン GET ───────────────────────────────────────────────────
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const type = req.nextUrl.searchParams.get("type") ?? "summary";
@@ -86,10 +98,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       hall:         str(r, "ルックアップ_会館名ティア") || str(r, "ルックアップ_会館名ティアグループ") || str(r, "会館名ティアグループ"),
       date:         str(r, "葬儀日_法要日"),
       category:     str(r, "葬法区分"),
-      division:     str(r, "事業部名"),
+      division:     normalizeDivision(str(r, "事業部名")),
       branch:       str(r, "支社名"),
       block:        str(r, "ブロック名"),
-      area:         str(r, "エリア名"),
+      area:         normalizeArea(str(r, "エリア名")),
       officiant:    str(r, "宗教者名"),
       yearMonth:    toYM(str(r, "葬儀日_法要日")) ?? "",
     }));
