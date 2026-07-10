@@ -83,7 +83,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       donation:     Math.round(num(r, "御布施金額")),
       rate:         num(r, "手数料率"),
       denomination: str(r, "宗教名"),
-      hall:         str(r, "ルックアップ_会館名ティア"),
+      hall:         str(r, "ルックアップ_会館名ティア") || str(r, "ルックアップ_会館名ティアグループ") || str(r, "会館名ティアグループ"),
       date:         str(r, "葬儀日_法要日"),
       category:     str(r, "葬法区分"),
       division:     str(r, "事業部名"),
