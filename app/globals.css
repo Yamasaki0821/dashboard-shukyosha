@@ -382,15 +382,7 @@ tr:last-child td:last-child  { border-bottom-right-radius: var(--radius); }
   .kpi-grid { grid-template-columns: 1fr; }
 }
 
-/* KPI card left accent bar (Silver-system compatible) */
-.kpi-card { position: relative; overflow: hidden; }
-.kpi-card::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 3px;
-  background: var(--accent, var(--color-primary));
-}
+/* iOS: KPI card is uniform white — no accent bar */
 
 /* 2-column grid */
 .grid-2col {

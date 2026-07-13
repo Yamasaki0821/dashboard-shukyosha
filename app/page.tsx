@@ -45,10 +45,10 @@ function rateBadge(rate: number) {
   return "badge badge-red";
 }
 
-// KPIカード
-function KpiCard({ accent, label, value, unit, sub }: { accent: string; label: string; value: string; unit?: string; sub?: string }) {
+// KPIカード（iOS統一・アクセントなし）
+function KpiCard({ label, value, unit, sub }: { label: string; value: string; unit?: string; sub?: string }) {
   return (
-    <div className="kpi-card" style={{ ["--accent" as any]: accent }}>
+    <div className="kpi-card">
       <div className="kpi-label">{label}</div>
       <div className="kpi-value">
         {value}{unit && <span className="kpi-unit">{unit}</span>}
@@ -221,30 +221,26 @@ export default function SummaryPage() {
 
         {data && (
           <>
-            {/* KPIカード（左アクセントライン規則: 緑→黄→青→赤）*/}
+            {/* KPIカード（iOS統一デザイン） */}
             <div className="kpi-grid" style={{ marginBottom: 20 }}>
               <KpiCard
-                accent="var(--color-green)"
                 label="累計手数料合計"
                 value={data.totalFee.toLocaleString()}
                 unit="千円"
                 sub={`累計予算 ${data.budgetTotal.toLocaleString()}千円`}
               />
               <KpiCard
-                accent="var(--color-yellow)"
                 label="累計予算達成率"
                 value={`${achieveRate}%`}
                 sub="10月〜当月累計ベース"
               />
               <KpiCard
-                accent="var(--color-blue)"
                 label="累計件数"
                 value={data.totalCount.toLocaleString()}
                 unit="件"
                 sub="葬儀＋法要 合計"
               />
               <KpiCard
-                accent="var(--color-red)"
                 label="平均手数料単価"
                 value={avgUnit > 0 ? avgUnit.toLocaleString() : "—"}
                 unit="千円"
