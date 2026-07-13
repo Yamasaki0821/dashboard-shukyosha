@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 
 function LoginForm() {
   const router = useRouter();
@@ -40,24 +39,31 @@ function LoginForm() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      background: "#f0f4f8",
-      fontFamily: "sans-serif",
+      background: "#f5f5f7",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Hiragino Sans', 'Yu Gothic', sans-serif",
+      letterSpacing: "-0.01em",
     }}>
       <div style={{
-        background: "#fff",
-        borderRadius: 12,
-        padding: "40px 36px",
-        width: 340,
-        boxShadow: "0 4px 24px rgba(0,0,0,0.10)",
+        background: "#ffffff",
+        borderRadius: 16,
+        padding: "44px 40px",
+        width: 380,
+        border: "0.5px solid #d2d2d7",
+        boxShadow: "0 6px 24px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04)",
       }}>
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#6a2d8f" }}>TEAR</div>
-          <div style={{ fontSize: 14, color: "#666", marginTop: 4 }}>宗教者紹介 予実ダッシュボード</div>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ display: "inline-flex", alignItems: "baseline", letterSpacing: "0.5px" }}>
+            <span style={{ fontSize: 28, fontWeight: 700, color: "#1d1d1f" }}>T</span>
+            <span style={{ fontSize: 28, fontWeight: 700, color: "#0071e3", marginLeft: 1 }}>EAR</span>
+          </div>
+          <div style={{ fontSize: 15, color: "#6e6e73", marginTop: 12, fontWeight: 500 }}>
+            宗教者紹介事業 Analytics
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: "block", fontSize: 13, color: "#444", marginBottom: 6 }}>
+            <label style={{ display: "block", fontSize: 14, color: "#1d1d1f", marginBottom: 8, fontWeight: 500 }}>
               お名前
             </label>
             <input
@@ -68,17 +74,20 @@ function LoginForm() {
               placeholder="例：山崎"
               style={{
                 width: "100%",
-                padding: "10px 12px",
-                border: "1px solid #d0d7e0",
-                borderRadius: 8,
-                fontSize: 15,
+                padding: "12px 14px",
+                border: "0.5px solid #d2d2d7",
+                borderRadius: 10,
+                fontSize: 16,
+                background: "#fafafc",
+                color: "#1d1d1f",
                 boxSizing: "border-box",
+                outline: "none",
               }}
             />
           </div>
 
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", fontSize: 13, color: "#444", marginBottom: 6 }}>
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: "block", fontSize: 14, color: "#1d1d1f", marginBottom: 8, fontWeight: 500 }}>
               パスワード
             </label>
             <input
@@ -88,23 +97,27 @@ function LoginForm() {
               required
               style={{
                 width: "100%",
-                padding: "10px 12px",
-                border: "1px solid #d0d7e0",
-                borderRadius: 8,
-                fontSize: 15,
+                padding: "12px 14px",
+                border: "0.5px solid #d2d2d7",
+                borderRadius: 10,
+                fontSize: 16,
+                background: "#fafafc",
+                color: "#1d1d1f",
                 boxSizing: "border-box",
+                outline: "none",
               }}
             />
           </div>
 
           {error && (
             <div style={{
-              color: "#c0392b",
-              fontSize: 13,
-              marginBottom: 14,
-              background: "#fff0ee",
-              padding: "8px 12px",
-              borderRadius: 6,
+              color: "#ff3b30",
+              fontSize: 14,
+              marginBottom: 16,
+              background: "#ffebeb",
+              padding: "10px 14px",
+              borderRadius: 10,
+              fontWeight: 500,
             }}>
               {error}
             </div>
@@ -115,17 +128,19 @@ function LoginForm() {
             disabled={loading}
             style={{
               width: "100%",
-              padding: "12px",
-              background: loading ? "#a0b4cc" : "#6a2d8f",
-              color: "#fff",
+              padding: "13px",
+              background: loading ? "#86868b" : "#0071e3",
+              color: "#ffffff",
               border: "none",
-              borderRadius: 8,
-              fontSize: 15,
-              fontWeight: 600,
+              borderRadius: 10,
+              fontSize: 16,
+              fontWeight: 500,
               cursor: loading ? "not-allowed" : "pointer",
+              letterSpacing: "-0.005em",
+              transition: "opacity 0.15s ease",
             }}
           >
-            {loading ? "ログイン中..." : "ログイン"}
+            {loading ? "ログイン中…" : "ログイン"}
           </button>
         </form>
       </div>

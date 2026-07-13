@@ -1,0 +1,467 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* ============ Apple Silver Classic ============ */
+  --color-bg: #f5f5f7;               /* Apple silver page */
+  --color-surface: #ffffff;
+  --color-surface-2: #fafafc;
+  --color-topbar: rgba(255, 255, 255, 0.85);
+  --color-border: #d2d2d7;
+  --color-separator: #c6c6c8;
+
+  /* iOS Text (Primary / Secondary の2階層に統一) */
+  --color-text: #1d1d1f;             /* Primary（見出し・本文・数字）*/
+  --color-text-sub: #6e6e73;         /* Secondary（単位・サブラベル・注釈）*/
+  --color-text-muted: #6e6e73;       /* 統一（tertiaryは廃止）*/
+
+  /* iOS system accent */
+  --color-primary: #0071e3;
+  --color-primary-light: #e6f0fd;
+  --color-primary-dark: #0058a3;
+  --color-accent: #64d2ff;
+
+  /* Data colors — iPhone配色（青×黄緑） */
+  --color-budget: #86868b;
+  --color-confirmed: #0071e3;   /* Apple Blue（確定）*/
+  --color-planned: #34c759;     /* Apple Green（見込み）*/
+
+  /* iOS system semantic */
+  --color-success: #34c759;
+  --color-success-light: #e5f8ea;
+  --color-warning: #ff9500;
+  --color-warning-light: #fff2e5;
+  --color-danger: #ff3b30;
+  --color-danger-light: #ffebeb;
+  --color-red: #ff3b30;
+  --color-red-light: #ffebeb;
+
+  /* Compat aliases */
+  --color-blue: #0071e3;
+  --color-blue-light: #e6f0fd;
+  --color-green: #34c759;
+  --color-green-light: #e5f8ea;
+  --color-yellow: #ff9500;
+  --color-yellow-light: #fff2e5;
+  --color-surface-secondary: #fafafc;
+  --color-text-secondary: #6e6e73;
+
+  --radius: 12px;
+  --radius-lg: 16px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04);
+
+  /* ============ iOS Typography Scale（統一） ============ */
+  /* Only 2 weights: 600 (semibold, 見出し・強調) / 500 (medium, 本文) */
+  --fs-page-title:  32px;   /* w600 */
+  --fs-section:     22px;   /* w600 */
+  --fs-heading:     17px;   /* w600 — カードラベル・テーブル列名 */
+  --fs-body:        17px;   /* w500 — テーブル本文・KPI補足 */
+  --fs-callout:     16px;   /* w500 — 通常本文 */
+  --fs-note:        15px;   /* w500 — 注釈・脚注（濃色で必ず読めるように）*/
+  --fs-kpi-num:     44px;   /* w600 — KPI大数字 */
+  --fs-kpi-unit:    18px;   /* w500 — 千円/件などの単位 */
+  --fs-tab:         16px;   /* w500 */
+}
+
+
+body {
+  font-family: var(--font-inter), var(--font-noto-jp), -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.55;
+  font-size: var(--fs-callout);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01", "ss03";
+}
+
+h1, h2, h3 {
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 1200px;
+    padding: 0 24px 48px;
+  }
+}
+
+.section-title {
+  font-size: var(--fs-section);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 14px;
+  padding-left: 2px;
+  letter-spacing: -0.02em;
+}
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 0.5px solid var(--color-border);
+  padding: 18px 20px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 768px) {
+  .grid-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.mb-section {
+  margin-bottom: 28px;
+}
+
+/* ========================
+   iOS-style table
+   ======================== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  background: var(--color-surface);
+  letter-spacing: -0.005em;
+}
+
+th {
+  background: var(--color-surface);
+  color: var(--color-text);                /* 見出しは濃い黒 */
+  padding: 14px 20px;
+  text-align: left;
+  font-weight: 600;
+  font-size: var(--fs-heading);
+  white-space: nowrap;
+  border-bottom: 0.5px solid var(--color-separator);
+  letter-spacing: -0.005em;
+}
+
+thead tr:first-child th { border-top: none; }
+
+th:first-child { border-top-left-radius: var(--radius); }
+th:last-child { border-top-right-radius: var(--radius); }
+
+td {
+  padding: 14px 20px;
+  border-bottom: 0.5px solid var(--color-separator);
+  color: var(--color-text);
+  font-weight: 500;
+  font-size: var(--fs-body);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+tr:last-child td:first-child { border-bottom-left-radius: var(--radius); }
+tr:last-child td:last-child  { border-bottom-right-radius: var(--radius); }
+
+/* ========================
+   iOS segmented control 風タブ
+   ======================== */
+.page-header {
+  background: var(--color-surface);
+  border-bottom: 0.5px solid var(--color-border);
+  padding: 24px 20px 0;
+}
+.page-header-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.page-title {
+  font-size: var(--fs-page-title);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  letter-spacing: -0.03em;
+}
+.page-title-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+.page-subtitle {
+  font-size: var(--fs-callout);
+  font-weight: 500;
+  color: var(--color-text-sub);
+  margin: 0 0 14px;
+  letter-spacing: -0.01em;
+}
+.pill-tab-bar {
+  margin-top: 12px;
+  padding-bottom: 12px;
+}
+.pill-nav {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: #eeeef1;
+  border-radius: 10px;
+  margin: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.pill-nav::-webkit-scrollbar { display: none; }
+.pill-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 22px;
+  font-size: var(--fs-tab);
+  font-weight: 500;
+  color: var(--color-text-sub);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  letter-spacing: -0.005em;
+}
+.pill-tab:hover {
+  color: var(--color-text);
+}
+.pill-tab.active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+}
+
+/* ========================
+   iOS-style button
+   ======================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  font-size: var(--fs-callout);
+  font-weight: 500;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  letter-spacing: -0.005em;
+}
+.btn:hover { opacity: 0.85; }
+.btn:active { opacity: 0.7; }
+.btn-primary {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--color-primary);
+  border: 0.5px solid var(--color-primary);
+}
+
+/* ========================
+   iOS-style KPI card（統一class）
+   ======================== */
+.kpi-card {
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.kpi-label {
+  font-size: var(--fs-heading);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+.kpi-value {
+  font-size: var(--fs-kpi-num);
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+.kpi-unit {
+  font-size: var(--fs-kpi-unit);
+  font-weight: 500;
+  color: var(--color-text-sub);
+  margin-left: 6px;
+  letter-spacing: -0.005em;
+}
+.kpi-sub {
+  font-size: var(--fs-note);
+  font-weight: 500;
+  color: var(--color-text-sub);
+  margin-top: 10px;
+  letter-spacing: -0.005em;
+}
+.section-note {
+  font-size: var(--fs-note);
+  font-weight: 500;
+  color: var(--color-text-sub);
+  margin-top: 10px;
+  letter-spacing: -0.005em;
+}
+
+/* ============================================================
+   Shukyosha additions (extends iOS Silver system)
+   ============================================================ */
+:root {
+  --color-text-strong: #1d1d1f;
+  --color-amber-dark: #b06000;
+}
+
+/* Page inner wrapper */
+.page-inner {
+  padding: 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+@media (max-width: 600px) {
+  .page-inner { padding: 16px 12px; }
+}
+
+/* Card title / subtitle (used inside .card) */
+.card-title {
+  font-size: var(--fs-heading);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+.card-subtitle {
+  font-size: var(--fs-note);
+  font-weight: 500;
+  color: var(--color-text-sub);
+  margin-bottom: 16px;
+  letter-spacing: -0.005em;
+}
+
+/* KPI grid (4 columns responsive) */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+}
+
+/* KPI card left accent bar (Silver-system compatible) */
+.kpi-card { position: relative; overflow: hidden; }
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent, var(--color-primary));
+}
+
+/* 2-column grid */
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 900px) {
+  .grid-2col { grid-template-columns: 1fr; }
+}
+
+/* iOS-styled data table (retains .data-table markup) */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  letter-spacing: -0.005em;
+}
+.data-table thead th {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: var(--fs-heading);
+  padding: 12px 14px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 0.5px solid var(--color-separator);
+  letter-spacing: -0.005em;
+}
+.data-table thead th:first-child { text-align: left; }
+.data-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--color-separator);
+  text-align: right;
+  color: var(--color-text);
+  font-weight: 500;
+  font-size: var(--fs-body);
+}
+.data-table tbody td:first-child { text-align: left; }
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover { background: var(--color-surface-2); }
+.data-table tfoot td {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  padding: 12px 14px;
+  font-weight: 600;
+  text-align: right;
+  border-top: 0.5px solid var(--color-separator);
+}
+.data-table tfoot td:first-child { text-align: left; }
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.badge-green { background: var(--color-green-light); color: #15803d; }
+.badge-amber { background: var(--color-yellow-light); color: var(--color-amber-dark); }
+.badge-red   { background: var(--color-red-light);   color: var(--color-red); }
+.badge-kintone {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  margin-left: 6px;
+  font-size: 11px;
+  padding: 2px 8px;
+}

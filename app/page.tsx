@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { TopBar, PageHeader } from "../components/Shell";
+import NavHeader from "../components/NavHeader";
 
 interface MonthlyRow {
   month: string;
@@ -82,7 +82,7 @@ function MonthlyBarChart({ data }: { data: MonthlyRow[] }) {
             type: "bar",
             label: "30%手数料",
             data: fee30,
-            backgroundColor: "#fde293",
+            backgroundColor: "#a5d8ff",
             stack: "fee",
             order: 3,
           },
@@ -90,7 +90,7 @@ function MonthlyBarChart({ data }: { data: MonthlyRow[] }) {
             type: "bar",
             label: "40%手数料",
             data: fee40,
-            backgroundColor: "#fbbc04",
+            backgroundColor: "#0071e3",
             stack: "fee",
             order: 3,
           },
@@ -98,11 +98,11 @@ function MonthlyBarChart({ data }: { data: MonthlyRow[] }) {
             type: "line",
             label: "予算",
             data: budgets,
-            borderColor: "#4285f4",
-            backgroundColor: "#4285f4",
+            borderColor: "#86868b",
+            backgroundColor: "#86868b",
             borderWidth: 3,
             pointRadius: 5,
-            pointBackgroundColor: "#4285f4",
+            pointBackgroundColor: "#86868b",
             pointBorderColor: "#fff",
             pointBorderWidth: 2,
             tension: 0,
@@ -154,7 +154,7 @@ function DonutChart({ rate30, rate40 }: { rate30: number; rate40: number }) {
         labels: ["30%手数料", "40%手数料"],
         datasets: [{
           data: [rate30, rate40],
-          backgroundColor: ["#fde293", "#fbbc04"],
+          backgroundColor: ["#a5d8ff", "#0071e3"],
           borderColor: "#fff",
           borderWidth: 2,
         }],
@@ -213,8 +213,7 @@ export default function SummaryPage() {
 
   return (
     <>
-      <TopBar />
-      <PageHeader active="summary" />
+      <NavHeader />
 
       <div className="page-inner">
         {loading && <p style={{ color: "var(--color-text-muted)" }}>読み込み中...</p>}
@@ -256,7 +255,7 @@ export default function SummaryPage() {
             {/* 月別グラフ */}
             <div className="card" style={{ marginBottom: 20 }}>
               <div className="card-title">月別手数料実績 vs 予算</div>
-              <div className="card-subtitle">単位：千円　／　棒=実績（黄濃淡で手数料率）　線=予算</div>
+              <div className="card-subtitle">単位：千円　／　棒=実績（青濃淡で手数料率）　線=予算</div>
               {chartReady ? (
                 <div style={{ height: 320 }}>
                   <MonthlyBarChart data={data.monthly} />

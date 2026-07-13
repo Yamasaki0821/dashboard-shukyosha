@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { TopBar, PageHeader } from "../../components/Shell";
+import NavHeader from "../../components/NavHeader";
 
 interface Row { name: string; fee: number; donation: number; count: number; }
 
@@ -150,8 +150,7 @@ export default function HallPage() {
 
   return (
     <>
-      <TopBar />
-      <PageHeader active="hall" />
+      <NavHeader />
 
       <div className="page-inner">
         {loading && <p style={{ color: "var(--color-text-muted)" }}>読み込み中...</p>}
