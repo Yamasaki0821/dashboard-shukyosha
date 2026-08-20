@@ -43,6 +43,17 @@ function normalizeName(s: string): string {
   return s.replace(/[\s　]+/g, "").trim();
 }
 
+// 葬法区分の表記ゆれ吸収。
+// 2026-08にKintone側の選択肢が変わり「葬儀」→「葬儀　※8月削除」となり、
+// 代わりに「二日葬」「一日葬」が新設された。注記は落として旧区分名に戻す
+function normalizeCategory(s: string): string {
+  const t = s.replace(/[\s　]*※.*$/, "").trim();
+  return t || "その他";
+}
+
+// 平均単価は「葬儀系（法要を除く）」で見る
+const FUNERAL_CATEGORIES = ["葬儀", "二日葬", "一日葬", "炉前"];
+
 // ── CSV パーサー ────────────────────────────────────────────────
 function parseCSV(content: string): Record<string, string>[] {
   const lines = content.trim().split(/\r?\n/);
@@ -108,7 +119,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       // 会館名フィールドはKintone改修で名称が変わった（2026-08時点：ルックアップ_会館名／会館名_ティアグループ）
       hall:         normalizeName(str(r, "ルックアップ_会館名") || str(r, "会館名_ティアグループ")),
       date:         str(r, "葬儀日_法要日"),
-      category:     str(r, "葬法区分"),
+      category:     normalizeCategory(str(r, "葬法区分")),
       division:     str(r, "事業部名"),
       branch:       str(r, "支社名"),
       block:        str(r, "ブロック名"),
@@ -206,7 +217,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const feeByCategory: Record<string, number> = {};
       for (const [k, v] of catMap.entries()) feeByCategory[k] = toK(v);
 
-      const funeral = kRecs.filter(r => r.category === "葬儀");
+      const funeral = kRecs.filter(r => FUNERAL_CATEGORIES.includes(r.category));
       const funeralCount = funeral.length;
       const funeralFee   = toK(funeral.reduce((s, r) => s + r.fee, 0));
 

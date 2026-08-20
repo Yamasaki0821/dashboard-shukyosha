@@ -262,7 +262,7 @@ export default function SummaryPage() {
                 label="累計件数"
                 value={data.totalCount.toLocaleString()}
                 unit="件"
-                sub={`葬儀＋法要 合計　／　平均手数料単価 ${avgUnit > 0 ? avgUnit.toLocaleString() : "—"}千円（葬儀のみ・${data.kintonePeriodLabel} ${data.funeralCount}件）`}
+                sub={`葬儀＋法要 合計　／　平均手数料単価 ${avgUnit > 0 ? avgUnit.toLocaleString() : "—"}千円（葬儀系・法要除く・${data.kintonePeriodLabel} ${data.funeralCount}件）`}
               />
             </div>
 
