@@ -43,6 +43,13 @@ function normalizeName(s: string): string {
   return s.replace(/[\s　]+/g, "").trim();
 }
 
+// 宗派名の表記ゆれ吸収。
+// 新フィールド `新宗教名` は「001:真宗大谷派」のようにコード付きで入るため、
+// 旧 `宗教名`（コードなし）と別物として集計されてしまう。コードを落として統合する
+function normalizeDenomination(s: string): string {
+  return s.replace(/^\s*\d+\s*[:：]\s*/, "").replace(/髙/g, "高").trim();
+}
+
 // 葬法区分の表記ゆれ吸収。
 // 2026-08にKintone側の選択肢が変わり「葬儀」→「葬儀　※8月削除」となり、
 // 代わりに「二日葬」「一日葬」が新設された。注記は落として旧区分名に戻す
@@ -115,7 +122,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       donation:     yen(num(r, "御布施金額")),
       rate:         num(r, "手数料率"),
       // 宗教名は「新宗教名」へ移行中。新側に入力があればそちらを優先する
-      denomination: str(r, "新宗教名") || str(r, "宗教名"),
+      denomination: normalizeDenomination(str(r, "新宗教名") || str(r, "宗教名")),
       // 会館名フィールドはKintone改修で名称が変わった（2026-08時点：ルックアップ_会館名／会館名_ティアグループ）
       hall:         normalizeName(str(r, "ルックアップ_会館名") || str(r, "会館名_ティアグループ")),
       date:         str(r, "葬儀日_法要日"),
@@ -298,7 +305,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       // 宗派別（CSV=手数料のみ + Kintone=手数料+お布施+件数）※円で集計
       const denomMap = new Map<string, { fee: number; donation: number; count: number; kintoneCount: number }>();
       for (const row of csvDenom) {
-        const name = row["宗旨宗派"] || "未入力";
+        const name = normalizeDenomination(row["宗旨宗派"] || "") || "未入力";
         const e = denomMap.get(name) ?? { fee: 0, donation: 0, count: 0, kintoneCount: 0 };
         e.fee   += parseFloat(row["手数料合計"] ?? "0") || 0;
         e.count += parseInt(row["件数"] ?? "0", 10) || 0;
