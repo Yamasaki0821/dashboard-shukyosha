@@ -46,8 +46,15 @@ function normalizeName(s: string): string {
 // 宗派名の表記ゆれ吸収。
 // 新フィールド `新宗教名` は「001:真宗大谷派」のようにコード付きで入るため、
 // 旧 `宗教名`（コードなし）と別物として集計されてしまう。コードを落として統合する
+// 同一とみなす宗派の対応表（2026-08-20 山崎さん判断）
+const DENOMINATION_ALIAS: Record<string, string> = {
+  "神式": "神道",
+  "真言智山派": "真言宗智山派",
+};
+
 function normalizeDenomination(s: string): string {
-  return s.replace(/^\s*\d+\s*[:：]\s*/, "").replace(/髙/g, "高").trim();
+  const t = s.replace(/^\s*\d+\s*[:：]\s*/, "").replace(/髙/g, "高").trim();
+  return DENOMINATION_ALIAS[t] ?? t;
 }
 
 // 葬法区分の表記ゆれ吸収。
