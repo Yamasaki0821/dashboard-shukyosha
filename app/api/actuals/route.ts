@@ -7,6 +7,13 @@ import * as fs from "fs";
 import * as path from "path";
 import { fetchAllKintoneRecords, str, num, toYM } from "../../../lib/kintone";
 
+// ── 期の定義（第30期）───────────────────────────────────────────
+// 期が変わったらこの3つだけ直す
+const FY_START = "2025-10";           // 期首
+const FY_END   = "2026-09";           // 期末
+const FY_END_DATE = "2026-09-30";     // 期末の末日
+const CSV_LAST = "2026-03";           // CSV（Excel集計）が担当する最終月。これより後はKintoneを採用
+
 // ── 予算（千円単位） ────────────────────────────────────────────
 const BUDGET: Record<string, number> = {
   "2025-10": 16073,
@@ -24,6 +31,17 @@ const BUDGET: Record<string, number> = {
 };
 
 const MONTHS_ORDER = Object.keys(BUDGET);
+
+// 日本時間の「今月」（サーバーがUTCでも当月がズレないように+9時間）
+function currentYMJst(): string {
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+// 表記ゆれ吸収（会館名・人名）
+function normalizeName(s: string): string {
+  return s.replace(/[\s　]+/g, "").trim();
+}
 
 // ── CSV パーサー ────────────────────────────────────────────────
 function parseCSV(content: string): Record<string, string>[] {
@@ -58,20 +76,11 @@ function csvMonthToYM(month: string): string | null {
   return null;
 }
 
-// ── Kintone クエリ ───────────────────────────────────────────────
-const KINTONE_QUERY = '葬儀日_法要日 >= "2026-04-01" and 葬儀日_法要日 <= "2026-09-30"';
+// ── Kintone クエリ（期全体を取得し、集計側でCSV期間を除外する）──
+const KINTONE_QUERY = `葬儀日_法要日 >= "${FY_START}-01" and 葬儀日_法要日 <= "${FY_END_DATE}"`;
 
-// ── 文字化けレコードの補正マップ ────────────────────────────
-// U+FFFDを含む値を正しい値に置換
-// 参照元マスターの化けが原因（レコード517=エリア名, 311/169=事業部名）
-function normalizeArea(s: string): string {
-  if (s && s.includes("�")) return "名古屋２エリア";
-  return s;
-}
-function normalizeDivision(s: string): string {
-  if (s && s.includes("�")) return "東海第１事業部";
-  return s;
-}
+const yen = (v: number) => Math.round(v);          // 円は整数で持つ
+const toK = (v: number) => Math.round(v / 1000);   // 千円へは最後に1回だけ丸める
 
 // ── メイン GET ───────────────────────────────────────────────────
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -89,66 +98,81 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       console.error("Kintone fetch error:", e);
     }
 
-    // Kintoneレコード整形
+    // Kintoneレコード整形（金額はすべて「円」のまま保持する）
     const kRecs = kintoneRecords.map(r => ({
-      fee:          Math.round(num(r, "手数料金額")),
-      donation:     Math.round(num(r, "御布施金額")),
+      fee:          yen(num(r, "手数料金額")),
+      donation:     yen(num(r, "御布施金額")),
       rate:         num(r, "手数料率"),
-      denomination: str(r, "宗教名"),
-      hall:         str(r, "ルックアップ_会館名ティア") || str(r, "ルックアップ_会館名ティアグループ") || str(r, "会館名ティアグループ"),
+      // 宗教名は「新宗教名」へ移行中。新側に入力があればそちらを優先する
+      denomination: str(r, "新宗教名") || str(r, "宗教名"),
+      // 会館名フィールドはKintone改修で名称が変わった（2026-08時点：ルックアップ_会館名／会館名_ティアグループ）
+      hall:         normalizeName(str(r, "ルックアップ_会館名") || str(r, "会館名_ティアグループ")),
       date:         str(r, "葬儀日_法要日"),
       category:     str(r, "葬法区分"),
-      division:     normalizeDivision(str(r, "事業部名")),
+      division:     str(r, "事業部名"),
       branch:       str(r, "支社名"),
       block:        str(r, "ブロック名"),
-      area:         normalizeArea(str(r, "エリア名")),
-      officiant:    str(r, "宗教者名"),
+      area:         str(r, "エリア名"),
+      officiant:    normalizeName(str(r, "新宗教者名") || str(r, "宗教者名")),
       yearMonth:    toYM(str(r, "葬儀日_法要日")) ?? "",
-    }));
+    }))
+    // CSVが担当する期間（〜2026-03）と期外は除外する＝二重計上・期ズレの防止
+    .filter(r => r.yearMonth > CSV_LAST && r.yearMonth >= FY_START && r.yearMonth <= FY_END);
+
+    const kintoneMonths = MONTHS_ORDER.filter(m => m > CSV_LAST);
+    const kintonePeriodLabel = `${parseInt(kintoneMonths[0].slice(5), 10)}月〜${parseInt(kintoneMonths[kintoneMonths.length - 1].slice(5), 10)}月`;
 
     // ══════════════════════════════════════════════════════════════
     // type=summary
     // ══════════════════════════════════════════════════════════════
     if (type === "summary") {
-      // CSV 月別（手数料のみ・お布施なし）
+      // CSV 月別（円で保持・手数料のみ／お布施なし）
       const csvMonthMap = new Map<string, { fee30: number; fee40: number; total: number; count: number }>();
       for (const row of csvMonthly) {
         const ym = csvMonthToYM(row["月"] ?? "");
-        if (!ym) continue;
+        if (!ym || ym > CSV_LAST) continue;
         csvMonthMap.set(ym, {
-          fee30: Math.round(parseFloat(row["30%手数料"] ?? "0") / 1000),
-          fee40: Math.round(parseFloat(row["40%手数料"] ?? "0") / 1000),
-          total: Math.round(parseFloat(row["月合計"] ?? "0") / 1000),
-          count: parseInt(row["件数"] ?? "0", 10),
+          fee30: parseFloat(row["30%手数料"] ?? "0") || 0,
+          fee40: parseFloat(row["40%手数料"] ?? "0") || 0,
+          total: parseFloat(row["月合計"]    ?? "0") || 0,
+          count: parseInt(row["件数"] ?? "0", 10) || 0,
         });
       }
 
-      // Kintone 月別（手数料・お布施両方）
+      // Kintone 月別（円で保持）
       const kMonthMap = new Map<string, { fee30: number; fee40: number; total: number; donation: number; count: number }>();
       for (const r of kRecs) {
         const ym = r.yearMonth;
         if (!ym) continue;
         const e = kMonthMap.get(ym) ?? { fee30: 0, fee40: 0, total: 0, donation: 0, count: 0 };
-        const feeK = Math.round(r.fee / 1000);
-        const donK = Math.round(r.donation / 1000);
-        e.total    += feeK;
-        e.donation += donK;
+        e.total    += r.fee;
+        e.donation += r.donation;
         e.count    += 1;
-        if (r.rate === 30) e.fee30 += feeK;
-        else if (r.rate === 40) e.fee40 += feeK;
+        if (r.rate === 30) e.fee30 += r.fee;
+        else if (r.rate === 40) e.fee40 += r.fee;
+        // 30%/40%以外（20%・15%・0%・未入力）は feeOther として下で差分計上する
         kMonthMap.set(ym, e);
       }
 
       const monthly = MONTHS_ORDER.map(ym => {
         const csv = csvMonthMap.get(ym) ?? { fee30: 0, fee40: 0, total: 0, count: 0 };
         const kt  = kMonthMap.get(ym)  ?? { fee30: 0, fee40: 0, total: 0, donation: 0, count: 0 };
-        const isKintonePeriod = ym >= "2026-04";
+        const isKintonePeriod = ym > CSV_LAST;
+
+        // 千円への丸めは「月ごとに1回だけ」。内訳は縦計・横計の両方が必ず合うように、
+        // 30%とその他を丸め、最大構成の40%で残差を吸収する
+        const total  = toK(csv.total + kt.total);
+        const fee30  = toK(csv.fee30 + kt.fee30);
+        const feeOther = toK((csv.total - csv.fee30 - csv.fee40) + (kt.total - kt.fee30 - kt.fee40));
+        const fee40  = total - fee30 - feeOther;
+
         return {
           month:    ym,
-          fee30:    csv.fee30 + kt.fee30,
-          fee40:    csv.fee40 + kt.fee40,
-          total:    csv.total + kt.total,
-          donation: isKintonePeriod ? kt.donation : null,
+          fee30,
+          fee40,
+          feeOther,
+          total,
+          donation: isKintonePeriod ? toK(kt.donation) : null,
           count:    csv.count + kt.count,
           budget:   BUDGET[ym] ?? 0,
         };
@@ -159,31 +183,38 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const totalCount    = monthly.reduce((s, m) => s + m.count, 0);
       const budgetTotal   = monthly.reduce((s, m) => s + m.budget, 0);
 
-      const rate30csv = csvMonthly.reduce((s, r) => s + parseFloat(r["30%手数料"] ?? "0"), 0);
-      const rate40csv = csvMonthly.reduce((s, r) => s + parseFloat(r["40%手数料"] ?? "0"), 0);
-      const rate30k   = kRecs.filter(r => r.rate === 30).reduce((s, r) => s + r.fee, 0);
-      const rate40k   = kRecs.filter(r => r.rate === 40).reduce((s, r) => s + r.fee, 0);
+      // 達成率の分母は「経過月（期首〜当月）の予算」。通期予算で割ると達成率が不当に低く出る
+      const nowYM = currentYMJst();
+      const elapsedMonth = nowYM < FY_START ? FY_START : (nowYM > FY_END ? FY_END : nowYM);
+      const budgetElapsed = MONTHS_ORDER
+        .filter(m => m <= elapsedMonth)
+        .reduce((s, m) => s + (BUDGET[m] ?? 0), 0);
 
+      // 手数料率別（累計）は月別テーブルの内訳と必ず一致させる
       const feeByRate = {
-        rate30: Math.round((rate30csv + rate30k) / 1000),
-        rate40: Math.round((rate40csv + rate40k) / 1000),
+        rate30: monthly.reduce((s, m) => s + m.fee30, 0),
+        rate40: monthly.reduce((s, m) => s + m.fee40, 0),
+        other:  monthly.reduce((s, m) => s + m.feeOther, 0),
       };
 
+      // 葬法区分別（Kintone期間のみ・円で集計してから丸める）
       const catMap = new Map<string, number>();
       for (const r of kRecs) {
         const cat = r.category || "その他";
-        catMap.set(cat, (catMap.get(cat) ?? 0) + Math.round(r.fee / 1000));
+        catMap.set(cat, (catMap.get(cat) ?? 0) + r.fee);
       }
       const feeByCategory: Record<string, number> = {};
-      for (const [k, v] of catMap.entries()) feeByCategory[k] = v;
+      for (const [k, v] of catMap.entries()) feeByCategory[k] = toK(v);
 
       const funeral = kRecs.filter(r => r.category === "葬儀");
       const funeralCount = funeral.length;
-      const funeralFee   = Math.round(funeral.reduce((s, r) => s + r.fee, 0) / 1000);
+      const funeralFee   = toK(funeral.reduce((s, r) => s + r.fee, 0));
 
       return NextResponse.json({
-        monthly, totalFee, totalDonation, totalCount, budgetTotal,
+        monthly, totalFee, totalDonation, totalCount,
+        budgetTotal, budgetElapsed, elapsedMonth,
         feeByRate, feeByCategory, funeralCount, funeralFee,
+        kintonePeriodLabel,
       });
     }
 
@@ -191,7 +222,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // type=hall（会館・事業部・エリア別）
     // ══════════════════════════════════════════════════════════════
     if (type === "hall") {
-      // 会館別（CSV=手数料のみ + Kintone=手数料+お布施）
+      // 会館別（CSV=手数料のみ + Kintone=手数料+お布施）※すべて円で集計し、最後に千円へ
       const hallMap = new Map<string, { fee: number; donation: number; count: number; hasKintone: boolean }>();
       const addHall = (name: string, fee: number, donation: number, count: number, fromKintone: boolean) => {
         const e = hallMap.get(name) ?? { fee: 0, donation: 0, count: 0, hasKintone: false };
@@ -200,22 +231,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         hallMap.set(name, e);
       };
       for (const row of csvHall) {
-        const name = row["会館名"] || "未入力";
-        addHall(name, Math.round(parseFloat(row["手数料合計"] ?? "0") / 1000), 0, parseInt(row["件数"] ?? "0", 10), false);
+        const name = normalizeName(row["会館名"] || "") || "未入力";
+        addHall(name, parseFloat(row["手数料合計"] ?? "0") || 0, 0, parseInt(row["件数"] ?? "0", 10) || 0, false);
       }
       for (const r of kRecs) {
-        const name = r.hall || "未入力";
-        addHall(name, Math.round(r.fee / 1000), Math.round(r.donation / 1000), 1, true);
+        addHall(r.hall || "未入力", r.fee, r.donation, 1, true);
       }
       const byHall = Array.from(hallMap.entries())
         .sort(([,a],[,b]) => b.fee - a.fee)
-        .map(([name, v]) => ({ name, fee: v.fee, donation: v.donation, count: v.count, hasKintone: v.hasKintone }));
+        .map(([name, v]) => ({ name, fee: toK(v.fee), donation: toK(v.donation), count: v.count, hasKintone: v.hasKintone }));
 
       // 支社別（Kintone のみ）
       const brMap = aggregateBy(kRecs, r => r.branch);
 
-      // エリア別 月別マトリクス（Kintone のみ・4月〜9月）
-      // { name, monthly: { "2026-04": { fee, donation, count }, ... }, total: {...} }
+      // エリア別 月別マトリクス（Kintone のみ）
       const areaMonthly = new Map<string, {
         monthly: Record<string, { fee: number; donation: number; count: number }>;
         total: { fee: number; donation: number; count: number };
@@ -223,31 +252,31 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       for (const r of kRecs) {
         const name = r.area || "未入力";
         const ym = r.yearMonth;
-        const e = areaMonthly.get(name) ?? {
-          monthly: {},
-          total: { fee: 0, donation: 0, count: 0 },
-        };
-        const feeK = Math.round(r.fee / 1000);
-        const donK = Math.round(r.donation / 1000);
+        const e = areaMonthly.get(name) ?? { monthly: {}, total: { fee: 0, donation: 0, count: 0 } };
         if (ym) {
           const mm = e.monthly[ym] ?? { fee: 0, donation: 0, count: 0 };
-          mm.fee += feeK; mm.donation += donK; mm.count += 1;
+          mm.fee += r.fee; mm.donation += r.donation; mm.count += 1;
           e.monthly[ym] = mm;
         }
-        e.total.fee += feeK; e.total.donation += donK; e.total.count += 1;
+        e.total.fee += r.fee; e.total.donation += r.donation; e.total.count += 1;
         areaMonthly.set(name, e);
       }
       const byAreaMonthly = Array.from(areaMonthly.entries())
         .sort(([,a],[,b]) => b.total.fee - a.total.fee)
-        .map(([name, v]) => ({ name, monthly: v.monthly, total: v.total }));
-
-      const kintoneMonths = MONTHS_ORDER.filter(m => m >= "2026-04");
+        .map(([name, v]) => ({
+          name,
+          monthly: Object.fromEntries(Object.entries(v.monthly).map(([ym, c]) => [ym, {
+            fee: toK(c.fee), donation: toK(c.donation), count: c.count,
+          }])),
+          total: { fee: toK(v.total.fee), donation: toK(v.total.donation), count: v.total.count },
+        }));
 
       return NextResponse.json({
         byHall,
         byBranch: mapToArray(brMap),
         byAreaMonthly,
         kintoneMonths,
+        kintonePeriodLabel,
       });
     }
 
@@ -255,21 +284,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // type=denomination（宗派・宗教者別＋月別マトリクス）
     // ══════════════════════════════════════════════════════════════
     if (type === "denomination") {
-      // 宗派別（CSV=手数料のみ + Kintone=手数料+お布施+件数）
-      // 平均単価: お布施÷件数, 手数料÷件数
+      // 宗派別（CSV=手数料のみ + Kintone=手数料+お布施+件数）※円で集計
       const denomMap = new Map<string, { fee: number; donation: number; count: number; kintoneCount: number }>();
       for (const row of csvDenom) {
         const name = row["宗旨宗派"] || "未入力";
         const e = denomMap.get(name) ?? { fee: 0, donation: 0, count: 0, kintoneCount: 0 };
-        e.fee   += Math.round(parseFloat(row["手数料合計"] ?? "0") / 1000);
-        e.count += parseInt(row["件数"] ?? "0", 10);
+        e.fee   += parseFloat(row["手数料合計"] ?? "0") || 0;
+        e.count += parseInt(row["件数"] ?? "0", 10) || 0;
         denomMap.set(name, e);
       }
       for (const r of kRecs) {
         const name = r.denomination || "未入力";
         const e = denomMap.get(name) ?? { fee: 0, donation: 0, count: 0, kintoneCount: 0 };
-        e.fee          += Math.round(r.fee / 1000);
-        e.donation     += Math.round(r.donation / 1000);
+        e.fee          += r.fee;
+        e.donation     += r.donation;
         e.count        += 1;
         e.kintoneCount += 1;
         denomMap.set(name, e);
@@ -278,15 +306,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         .sort(([,a],[,b]) => b.fee - a.fee)
         .map(([name, v]) => ({
           name,
-          fee:         v.fee,
-          donation:    v.donation,
+          fee:         toK(v.fee),
+          donation:    toK(v.donation),
           count:       v.count,
-          avgDonation: v.kintoneCount > 0 ? Math.round(v.donation / v.kintoneCount) : 0,
-          avgFee:      v.count > 0 ? Math.round(v.fee / v.count) : 0,
+          avgDonation: v.kintoneCount > 0 ? toK(v.donation / v.kintoneCount) : 0,
+          avgFee:      v.count > 0 ? toK(v.fee / v.count) : 0,
         }));
 
       // 宗教者別（Kintoneのみ）月別マトリクス
-      // { name, monthly: { "2026-04": fee, ... }, total: { fee, donation, count } }
       const officiantMonthly = new Map<string, {
         monthly: Record<string, number>;
         total: { fee: number; donation: number; count: number };
@@ -294,30 +321,26 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       for (const r of kRecs) {
         const name = r.officiant || "未入力";
         const ym = r.yearMonth;
-        const e = officiantMonthly.get(name) ?? {
-          monthly: {},
-          total: { fee: 0, donation: 0, count: 0 },
-        };
-        const feeK = Math.round(r.fee / 1000);
-        if (ym) {
-          e.monthly[ym] = (e.monthly[ym] ?? 0) + feeK;
-        }
-        e.total.fee      += feeK;
-        e.total.donation += Math.round(r.donation / 1000);
+        const e = officiantMonthly.get(name) ?? { monthly: {}, total: { fee: 0, donation: 0, count: 0 } };
+        if (ym) e.monthly[ym] = (e.monthly[ym] ?? 0) + r.fee;
+        e.total.fee      += r.fee;
+        e.total.donation += r.donation;
         e.total.count    += 1;
         officiantMonthly.set(name, e);
       }
       const byOfficiantMonthly = Array.from(officiantMonthly.entries())
         .sort(([,a],[,b]) => b.total.fee - a.total.fee)
-        .map(([name, v]) => ({ name, monthly: v.monthly, total: v.total }));
-
-      // Kintone期間の月（4月〜9月）
-      const kintoneMonths = MONTHS_ORDER.filter(m => m >= "2026-04");
+        .map(([name, v]) => ({
+          name,
+          monthly: Object.fromEntries(Object.entries(v.monthly).map(([ym, f]) => [ym, toK(f)])),
+          total: { fee: toK(v.total.fee), donation: toK(v.total.donation), count: v.total.count },
+        }));
 
       return NextResponse.json({
         byDenomination,
         byOfficiantMonthly,
         kintoneMonths,
+        kintonePeriodLabel,
       });
     }
 
@@ -339,8 +362,8 @@ function aggregateBy(
   for (const r of recs) {
     const name = keyFn(r) || "未入力";
     const e = m.get(name) ?? { fee: 0, donation: 0, count: 0 };
-    e.fee      += Math.round(r.fee / 1000);
-    e.donation += Math.round(r.donation / 1000);
+    e.fee      += r.fee;
+    e.donation += r.donation;
     e.count    += 1;
     m.set(name, e);
   }
@@ -350,5 +373,5 @@ function aggregateBy(
 function mapToArray(m: Map<string, { fee: number; donation: number; count: number }>) {
   return Array.from(m.entries())
     .sort(([,a],[,b]) => b.fee - a.fee)
-    .map(([name, v]) => ({ name, fee: v.fee, donation: v.donation, count: v.count }));
+    .map(([name, v]) => ({ name, fee: Math.round(v.fee / 1000), donation: Math.round(v.donation / 1000), count: v.count }));
 }

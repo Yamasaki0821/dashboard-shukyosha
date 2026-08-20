@@ -5,7 +5,7 @@ export const revalidate = 0;
 import { NextResponse } from "next/server";
 import { fetchAllKintoneRecords, str } from "../../../lib/kintone";
 
-const KINTONE_QUERY = '葬儀日_法要日 >= "2026-04-01" and 葬儀日_法要日 <= "2026-09-30"';
+const KINTONE_QUERY = '葬儀日_法要日 >= "2025-10-01" and 葬儀日_法要日 <= "2026-09-30"';
 
 // 文字化けの原因となる文字コード範囲
 // 参考: 一般的な日本語文字は以下のいずれか
@@ -85,8 +85,8 @@ export async function GET(): Promise<NextResponse> {
 
     for (const r of records) {
       const fields = {
-        "会館名(ティア)": str(r, "ルックアップ_会館名ティア"),
-        "会館名(ティアグループ)": str(r, "ルックアップ_会館名ティアグループ"),
+        "会館名(ティア)": str(r, "ルックアップ_会館名"),
+        "会館名(ティアグループ)": str(r, "会館名_ティアグループ"),
         "エリア名": str(r, "エリア名"),
         "事業部名": str(r, "事業部名"),
         "支社名": str(r, "支社名"),
