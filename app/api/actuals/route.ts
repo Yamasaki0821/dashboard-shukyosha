@@ -43,6 +43,54 @@ function normalizeName(s: string): string {
   return s.replace(/[\s　]+/g, "").trim();
 }
 
+// 会館名の名寄せ（2026-08-21 山崎さんと1件ずつ確認して確定）
+// ・キーは normalizeName 済み（空白除去後）の文字列と一致させること
+// ・部分一致で寄せてはいけない。「豊橋岩田」は「豊橋」とは別店舗（山崎さん明言）
+const HALL_ALIAS: Record<string, string> = {
+  // 略記・旧表記
+  "黒川東": "黒川東館",
+  "岩田": "豊橋岩田",
+  "川越": "三重川越",
+  "牛川": "豊橋牛川",
+  "藤沢": "豊橋藤沢",
+  // 蒲郡三谷（Kintone側に旧名称「東海典礼」の残りがある）
+  "三谷": "蒲郡三谷",
+  "東海典礼蒲郡三谷": "蒲郡三谷",
+  // 野田（同上）
+  "東海典礼野田": "野田",
+  "野田会館": "野田",
+  // 門真大東（CSV2種＋Kintone3種を1本化。家族葬ホールも含めて集約：山崎さん判断）
+  "門真大東・家": "門真大東",
+  "門真大東西館": "門真大東",
+  "門真大東家族葬": "門真大東",
+  "門真大東会館": "門真大東",
+  "ティア門真大東": "門真大東",
+  // 大阪・蒲生
+  "蒲生・鶴見": "蒲生",
+  "大東鶴見": "蒲生",
+  // 異体字・誤記
+  "新清州": "新清洲",   // 「清須古城」は別会館。混同しないこと
+  "岡﨑北": "岡崎北",
+  "弥冨通": "弥富通",
+  "日新香久山": "日進香久山",
+  // 単独表記の寄せ先（山崎さん指定）
+  "蒲郡": "蒲郡西",
+  "門真": "門真巣本",
+  "熱田炉前": "熱田",
+  // 会館ではない施行場所
+  "自宅(津島)": "自宅",
+  "ご自宅": "自宅",
+  "自宅中川": "自宅",
+  "稱圓寺（栄生）": "寺院",
+  "寺院法要": "寺院",
+  "金清寺": "寺院",
+};
+
+function normalizeHall(s: string): string {
+  const t = normalizeName(s);
+  return HALL_ALIAS[t] ?? t;
+}
+
 // 宗派名の表記ゆれ吸収。
 // 新フィールド `新宗教名` は「001:真宗大谷派」のようにコード付きで入るため、
 // 旧 `宗教名`（コードなし）と別物として集計されてしまう。コードを落として統合する
@@ -131,7 +179,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       // 宗教名は「新宗教名」へ移行中。新側に入力があればそちらを優先する
       denomination: normalizeDenomination(str(r, "新宗教名") || str(r, "宗教名")),
       // 会館名フィールドはKintone改修で名称が変わった（2026-08時点：ルックアップ_会館名／会館名_ティアグループ）
-      hall:         normalizeName(str(r, "ルックアップ_会館名") || str(r, "会館名_ティアグループ")),
+      hall:         normalizeHall(str(r, "ルックアップ_会館名") || str(r, "会館名_ティアグループ")),
       date:         str(r, "葬儀日_法要日"),
       category:     normalizeCategory(str(r, "葬法区分")),
       division:     str(r, "事業部名"),
@@ -256,7 +304,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         hallMap.set(name, e);
       };
       for (const row of csvHall) {
-        const name = normalizeName(row["会館名"] || "") || "未入力";
+        const name = normalizeHall(row["会館名"] || "") || "未入力";
         addHall(name, parseFloat(row["手数料合計"] ?? "0") || 0, 0, parseInt(row["件数"] ?? "0", 10) || 0, false);
       }
       for (const r of kRecs) {
