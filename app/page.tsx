@@ -255,7 +255,7 @@ export default function SummaryPage() {
                 label="累計手数料合計（確定）"
                 value={data.totalFee.toLocaleString()}
                 unit="千円"
-                sub={`10月〜${elapsedLabel}の確定分（葬儀執行済）　／　見込み ${data.totalPlanned.toLocaleString()}千円・${data.totalPlannedCount}件`}
+                sub={`10月〜${elapsedLabel}の確定分（葬儀執行済）　／　見込み（通期・9月まで）${data.totalPlanned.toLocaleString()}千円・${data.totalPlannedCount}件`}
               />
               <KpiCard
                 label="累計予算達成率"
