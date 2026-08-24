@@ -38,6 +38,11 @@ function currentYMJst(): string {
   return `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+// JST基準の今日（YYYY-MM-DD）。葬儀日がこれ以前なら確定、以後なら見込み
+function jstToday(): string {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 // 表記ゆれ吸収（会館名・人名）
 function normalizeName(s: string): string {
   return s.replace(/[\s　]+/g, "").trim();
@@ -171,7 +176,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     // Kintoneレコード整形（金額はすべて「円」のまま保持する）
-    const kRecs = kintoneRecords.map(r => ({
+    const todayJst = jstToday();
+    const kRecsAll = kintoneRecords.map(r => ({
       fee:          yen(num(r, "手数料金額")),
       donation:     yen(num(r, "御布施金額")),
       rate:         num(r, "手数料率"),
@@ -187,9 +193,19 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       area:         str(r, "エリア名"),
       officiant:    normalizeName(str(r, "新宗教者名") || str(r, "宗教者名")),
       yearMonth:    toYM(str(r, "葬儀日_法要日")) ?? "",
+      // 2026-08-24：葬儀日が今日以前なら確定、未来なら見込み（山崎さん判断）。
+      // 従来はこの区別が無く、まだ葬儀が行われていない予定分まで「実績」に入れていた。
+      // 他の4事業はすべて確定と見込みを分けており、宗教者紹介だけ混ざっていたため
+      // 全社の達成率が実態より高く出ていた。
+      isConfirmed:  str(r, "葬儀日_法要日") !== "" && str(r, "葬儀日_法要日") <= todayJst,
     }))
     // CSVが担当する期間（〜2026-03）と期外は除外する＝二重計上・期ズレの防止
     .filter(r => r.yearMonth > CSV_LAST && r.yearMonth >= FY_START && r.yearMonth <= FY_END);
+
+    // 以降の集計はすべて「確定」だけを使う。見込みは summary の専用項目でのみ扱う。
+    // CSV期間（〜2026-03）は既に葬儀が済んでいるため全額が確定。
+    const kRecs        = kRecsAll.filter(r => r.isConfirmed);
+    const kRecsPlanned = kRecsAll.filter(r => !r.isConfirmed);
 
     const kintoneMonths = MONTHS_ORDER.filter(m => m > CSV_LAST);
     const kintonePeriodLabel = `${parseInt(kintoneMonths[0].slice(5), 10)}月〜${parseInt(kintoneMonths[kintoneMonths.length - 1].slice(5), 10)}月`;
@@ -226,6 +242,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         kMonthMap.set(ym, e);
       }
 
+      // 見込み（葬儀日が未来）月別（円で保持）
+      const kPlannedMap = new Map<string, { total: number; count: number }>();
+      for (const r of kRecsPlanned) {
+        const ym = r.yearMonth;
+        if (!ym) continue;
+        const e = kPlannedMap.get(ym) ?? { total: 0, count: 0 };
+        e.total += r.fee;
+        e.count += 1;
+        kPlannedMap.set(ym, e);
+      }
+
       const monthly = MONTHS_ORDER.map(ym => {
         const csv = csvMonthMap.get(ym) ?? { fee30: 0, fee40: 0, total: 0, count: 0 };
         const kt  = kMonthMap.get(ym)  ?? { fee30: 0, fee40: 0, total: 0, donation: 0, count: 0 };
@@ -238,22 +265,29 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         const feeOther = toK((csv.total - csv.fee30 - csv.fee40) + (kt.total - kt.fee30 - kt.fee40));
         const fee40  = total - fee30 - feeOther;
 
+        const pl = kPlannedMap.get(ym) ?? { total: 0, count: 0 };
+
         return {
           month:    ym,
           fee30,
           fee40,
           feeOther,
           total,
+          // 見込み（葬儀日が未来のもの）。total には含めない
+          planned:      toK(pl.total),
+          plannedCount: pl.count,
           donation: isKintonePeriod ? toK(kt.donation) : null,
           count:    csv.count + kt.count,
           budget:   BUDGET[ym] ?? 0,
         };
       });
 
-      const totalFee      = monthly.reduce((s, m) => s + m.total, 0);
-      const totalDonation = monthly.reduce((s, m) => s + (m.donation ?? 0), 0);
-      const totalCount    = monthly.reduce((s, m) => s + m.count, 0);
-      const budgetTotal   = monthly.reduce((s, m) => s + m.budget, 0);
+      const totalFee          = monthly.reduce((s, m) => s + m.total, 0);
+      const totalPlanned      = monthly.reduce((s, m) => s + m.planned, 0);
+      const totalPlannedCount = monthly.reduce((s, m) => s + m.plannedCount, 0);
+      const totalDonation     = monthly.reduce((s, m) => s + (m.donation ?? 0), 0);
+      const totalCount        = monthly.reduce((s, m) => s + m.count, 0);
+      const budgetTotal       = monthly.reduce((s, m) => s + m.budget, 0);
 
       // 達成率の分母は「経過月（期首〜当月）の予算」。通期予算で割ると達成率が不当に低く出る
       const nowYM = currentYMJst();
@@ -284,6 +318,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
       return NextResponse.json({
         monthly, totalFee, totalDonation, totalCount,
+        totalPlanned, totalPlannedCount,
         budgetTotal, budgetElapsed, elapsedMonth,
         feeByRate, feeByCategory, funeralCount, funeralFee,
         kintonePeriodLabel,

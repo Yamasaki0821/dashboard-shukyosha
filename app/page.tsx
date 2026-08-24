@@ -10,6 +10,8 @@ interface MonthlyRow {
   fee40: number;
   feeOther: number;
   total: number;
+  planned: number;        // 見込み（葬儀日が未来）
+  plannedCount: number;
   donation: number | null;
   count: number;
   budget: number;
@@ -17,7 +19,9 @@ interface MonthlyRow {
 
 interface SummaryData {
   monthly: MonthlyRow[];
-  totalFee: number;
+  totalFee: number;         // 確定のみ（葬儀日が今日以前）
+  totalPlanned: number;     // 見込み（葬儀日が未来）
+  totalPlannedCount: number;
   totalDonation: number;
   totalCount: number;
   budgetTotal: number;      // 通期予算
@@ -248,10 +252,10 @@ export default function SummaryPage() {
                 sub={`通期予算 ${data.budgetTotal.toLocaleString()}千円`}
               />
               <KpiCard
-                label="累計手数料合計"
+                label="累計手数料合計（確定）"
                 value={data.totalFee.toLocaleString()}
                 unit="千円"
-                sub={`10月〜${elapsedLabel}実績`}
+                sub={`10月〜${elapsedLabel}の確定分（葬儀執行済）　／　見込み ${data.totalPlanned.toLocaleString()}千円・${data.totalPlannedCount}件`}
               />
               <KpiCard
                 label="累計予算達成率"
