@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import NavHeader from "../components/NavHeader";
+import { BudgetActualTable, LandingForecastTable, type BudgetRow } from "../components/BudgetTables";
 
 interface MonthlyRow {
   month: string;
@@ -41,17 +42,6 @@ const MONTH_LABELS: Record<string, string> = {
   "2026-07": "7月",  "2026-08": "8月",  "2026-09": "9月",
 };
 
-// 達成率→色クラス
-function rateColor(rate: number) {
-  if (rate >= 90) return "var(--color-green)";
-  if (rate >= 70) return "var(--color-amber-dark)";
-  return "var(--color-red)";
-}
-function rateBadge(rate: number) {
-  if (rate >= 90) return "badge badge-green";
-  if (rate >= 70) return "badge badge-amber";
-  return "badge badge-red";
-}
 
 // KPIカード（iOS統一・アクセントなし）
 function KpiCard({ label, value, unit, sub }: { label: string; value: string; unit?: string; sub?: string }) {
@@ -233,6 +223,27 @@ export default function SummaryPage() {
     : 0;
   const elapsedLabel = data ? `${parseInt(data.elapsedMonth.slice(5), 10)}月` : "";
 
+  /**
+   * 予実表の行データ。型は霊園DB・不動産DB・相続DBと共通
+   * （components/BudgetTables.tsx の BudgetRow）。
+   *
+   * 宗教者紹介の確定／見込みは葬儀日で分かれる（2026-08-24 山崎さん判断）。
+   *   確定 = 葬儀日_法要日 が今日以前 → monthly[].total
+   *   見込み = 葬儀日が未来           → monthly[].planned
+   * APIは以前から planned を返していたが、月別表に列が無く画面に出ていなかった。
+   *
+   * confirmed に null を入れる＝「まだ締まっていない月」。0（締まったが売上ゼロ）と区別する。
+   * これを入れないと、まだ来ていない月の 0 が累計に足し込まれて達成率が嘘になる。
+   */
+  const budgetRows: BudgetRow[] = data
+    ? data.monthly.map(m => ({
+        label: MONTH_LABELS[m.month] ?? m.month,
+        budget: m.budget,
+        confirmed: m.month > data.elapsedMonth ? null : m.total,
+        forecast: m.planned,
+      }))
+    : [];
+
   return (
     <>
       <NavHeader />
@@ -283,28 +294,46 @@ export default function SummaryPage() {
               )}
             </div>
 
-            {/* 月別詳細テーブル */}
+            {/* 月次 予算実績（表1・表2）
+                型は霊園DB・不動産DB・相続DBと共通（2026-08-26 山崎さん承認の正規版）。
+                components/BudgetTables.tsx をそのままコピーし、ここでは行データだけを組み立てる。
+                旧・月別詳細テーブルは予実と内訳（30%/40%/お布施/件数）が1表に混ざっており、
+                しかも見込み列が無かった。2026-09-01 に予実と内訳の2つに分けた */}
             <div className="card" style={{ marginBottom: 20 }}>
-              <div className="card-title">月別詳細（10月〜9月・第30期）</div>
-              <div className="card-subtitle">単位：千円　／　お布施額は4月以降Kintone連携のみ　／　達成率：90%↑緑・70-89%黄・70%未満赤　／　合計行の予算は経過月（10月〜{elapsedLabel}）の累計</div>
+              <div className="card-title">表1　月次 予算実績（確定分のみ）</div>
+              <div className="card-subtitle">
+                確定 = 葬儀日・法要日が今日以前。見込みは含めないので、月を締めたら動かない数字。単位：千円
+              </div>
+              <BudgetActualTable rows={budgetRows} />
+            </div>
+
+            <div className="card" style={{ marginBottom: 20 }}>
+              <div className="card-title">表2　月次 着地見込み（実績＋見込）</div>
+              <div className="card-subtitle">
+                見込み = 葬儀日・法要日が未来。葬儀日の月に置いて通期の着地を予測する。単位：千円
+              </div>
+              <LandingForecastTable rows={budgetRows} />
+            </div>
+
+            {/* 内訳テーブル（予実から分離）。手数料率・お布施・件数はここで見る */}
+            <div className="card" style={{ marginBottom: 20 }}>
+              <div className="card-title">月別内訳（手数料率・お布施・件数）</div>
+              <div className="card-subtitle">単位：千円　／　お布施額は4月以降Kintone連携のみ　／　合計は経過月（10月〜{elapsedLabel}）の累計</div>
               <div style={{ overflowX: "auto" }}>
-                <table className="data-table">
+                <table className="data-table data-table--sticky is-md">
                   <thead>
                     <tr>
                       <th>月</th>
-                      <th>予算</th>
-                      <th>手数料合計</th>
-                      <th>達成率</th>
                       <th>30%手数料</th>
                       <th>40%手数料</th>
                       <th>その他の率</th>
                       <th>お布施額</th>
                       <th>件数</th>
+                      <th>見込み件数</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.monthly.map((m) => {
-                      const rate = m.budget > 0 ? Math.round((m.total / m.budget) * 100) : 0;
                       const isKintone = m.month >= "2026-04";
                       return (
                         <tr key={m.month}>
@@ -312,9 +341,6 @@ export default function SummaryPage() {
                             {MONTH_LABELS[m.month] ?? m.month}
                             {isKintone && <span className="badge badge-kintone">Kintone</span>}
                           </td>
-                          <td style={{ color: "var(--color-text-muted)" }}>{m.budget.toLocaleString()}</td>
-                          <td style={{ fontWeight: 700 }}>{m.total.toLocaleString()}</td>
-                          <td>{m.budget > 0 ? <span className={rateBadge(rate)}>{rate}%</span> : "—"}</td>
                           <td>{m.fee30.toLocaleString()}</td>
                           <td>{m.fee40.toLocaleString()}</td>
                           <td>{m.feeOther.toLocaleString()}</td>
@@ -322,6 +348,9 @@ export default function SummaryPage() {
                             {m.donation === null ? "—" : m.donation.toLocaleString()}
                           </td>
                           <td>{m.count.toLocaleString()}</td>
+                          <td style={{ color: m.plannedCount === 0 ? "var(--color-text-muted)" : "var(--color-planned, #34c759)" }}>
+                            {m.plannedCount === 0 ? "—" : m.plannedCount.toLocaleString()}
+                          </td>
                         </tr>
                       );
                     })}
@@ -329,14 +358,12 @@ export default function SummaryPage() {
                   <tfoot>
                     <tr>
                       <td>合計</td>
-                      <td>{data.budgetElapsed.toLocaleString()}</td>
-                      <td>{data.totalFee.toLocaleString()}</td>
-                      <td style={{ color: achieveRate >= 90 ? "#a8f0c1" : achieveRate >= 70 ? "#fde293" : "#fcc1bb" }}>{achieveRate}%</td>
                       <td>{data.feeByRate.rate30.toLocaleString()}</td>
                       <td>{data.feeByRate.rate40.toLocaleString()}</td>
                       <td>{data.feeByRate.other.toLocaleString()}</td>
                       <td>{data.totalDonation.toLocaleString()}</td>
                       <td>{data.totalCount.toLocaleString()}</td>
+                      <td>{data.totalPlannedCount.toLocaleString()}</td>
                     </tr>
                   </tfoot>
                 </table>

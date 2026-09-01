@@ -35,7 +35,7 @@ function DenomTable({ rows }: { rows: DenomRow[] }) {
   const totalDonation = rows.reduce((s, r) => s + r.donation, 0);
   const totalCount    = rows.reduce((s, r) => s + r.count, 0);
   return (
-    <table className="data-table">
+    <table className="data-table data-table--sticky is-rank is-md">
       <thead>
         <tr>
           <th>順位</th>
@@ -85,7 +85,7 @@ function OfficiantMatrix({ rows, months }: { rows: OfficiantRow[]; months: strin
     monthTotals[m] = rows.reduce((s, r) => s + (r.monthly[m] ?? 0), 0);
   });
   return (
-    <table className="data-table">
+    <table className="data-table data-table--sticky is-rank is-lg">
       <thead>
         <tr>
           <th>順位</th>

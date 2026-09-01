@@ -60,6 +60,7 @@
   --fs-section:     22px;   /* w600 */
   --fs-heading:     17px;   /* w600 — カードラベル・テーブル列名 */
   --fs-body:        17px;   /* w500 — テーブル本文・KPI補足 */
+  --fs-body-dense:  15px;   /* w500 — 列数の多いテーブル（月別×エリア・月別×宗教者）本文と列名。1つの表の中では必ずこれ1本に統一する */
   --fs-callout:     16px;   /* w500 — 通常本文 */
   --fs-note:        15px;   /* w500 — 注釈・脚注（濃色で必ず読めるように）*/
   --fs-kpi-num:     44px;   /* w600 — KPI大数字 */
@@ -457,3 +458,66 @@ tr:last-child td:last-child  { border-bottom-right-radius: var(--radius); }
   font-size: 11px;
   padding: 2px 8px;
 }
+
+/* ========================
+   横長テーブル（スキル dashboard-table）
+   ========================
+   月×エリア のように列が多い表は、横スクロールすると「今どの行を見ているか」が
+   分からなくなる。先頭の見出し列を固定する。
+
+   使い方：<table className="data-table data-table--sticky is-lg">
+           順位＋名前の2列が見出しの表は is-rank も足す
+
+   注意：
+   - 固定セルには必ず背景色を置く。透明だと右の数字が透けて重なる
+   - thead は tbody より z-index を +1（左上で交差するため）
+   - hover と tfoot は背景が変わるので、固定セル側も同じ色に上書きする
+   - スクロールは外側の div（overflow-x:auto）だけが担当する */
+.data-table--sticky {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-body-dense);
+  /* 🔴 .data-table は角丸のために overflow:hidden を持っている。
+     これが残っていると table 自身がスクロールコンテナ扱いになり、
+     中の sticky セルが「外側の div のスクロール」に反応しなくなる＝固定が効かない。
+     固定する表だけ visible に戻す（角丸は外側のカードが持っている） */
+  overflow: visible;
+}
+.data-table--sticky thead th,
+.data-table--sticky tbody td,
+.data-table--sticky tfoot td {
+  font-size: var(--fs-body-dense);
+  padding: 10px 12px;
+}
+.data-table--sticky.is-md { min-width: 940px; }
+.data-table--sticky.is-lg { min-width: 1180px; }
+
+.data-table--sticky thead th:first-child,
+.data-table--sticky tbody td:first-child,
+.data-table--sticky tfoot td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--color-surface);
+}
+.data-table--sticky thead th:first-child { z-index: 3; }
+.data-table--sticky tfoot  td:first-child { background: var(--color-surface-2); }
+.data-table--sticky tbody tr:hover td:first-child { background: var(--color-surface-2); }
+
+/* 順位＋名前の2列が行の見出しになる表（会館別・エリア別・宗教者別）。
+   順位の幅を固定し、名前をその右に置く。tfoot は colSpan=2 なので1セルで足りる */
+.data-table--sticky.is-rank thead th:first-child,
+.data-table--sticky.is-rank tbody td:first-child {
+  width: 56px;
+  min-width: 56px;
+  padding-right: 6px;
+}
+.data-table--sticky.is-rank thead th:nth-child(2),
+.data-table--sticky.is-rank tbody td:nth-child(2) {
+  position: sticky;
+  left: 56px;
+  z-index: 2;
+  background: var(--color-surface);
+}
+.data-table--sticky.is-rank thead th:nth-child(2) { z-index: 3; }
+.data-table--sticky.is-rank tbody tr:hover td:nth-child(2) { background: var(--color-surface-2); }

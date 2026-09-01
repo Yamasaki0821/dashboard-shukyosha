@@ -31,7 +31,7 @@ function Table({ rows, label, showDonation }: { rows: Row[]; label: string; show
   const totalDonation = rows.reduce((s, r) => s + r.donation, 0);
   const totalCount    = rows.reduce((s, r) => s + r.count, 0);
   return (
-    <table className="data-table">
+    <table className="data-table data-table--sticky is-rank is-md">
       <thead>
         <tr>
           <th>順位</th>
@@ -91,7 +91,7 @@ function AreaMatrix({ rows, months, metric }: { rows: AreaMonthlyRow[]; months: 
   });
   const grandTotal = rows.reduce((s, r) => s + r.total[metric], 0);
   return (
-    <table className="data-table">
+    <table className="data-table data-table--sticky is-rank is-lg">
       <thead>
         <tr>
           <th>順位</th>
