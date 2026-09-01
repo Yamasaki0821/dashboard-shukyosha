@@ -43,19 +43,6 @@ const MONTH_LABELS: Record<string, string> = {
 };
 
 
-// KPIカード（iOS統一・アクセントなし）
-function KpiCard({ label, value, unit, sub }: { label: string; value: string; unit?: string; sub?: string }) {
-  return (
-    <div className="kpi-card">
-      <div className="kpi-label">{label}</div>
-      <div className="kpi-value">
-        {value}{unit && <span className="kpi-unit">{unit}</span>}
-      </div>
-      {sub && <div className="kpi-sub">{sub}</div>}
-    </div>
-  );
-}
-
 // 月別棒グラフ
 function MonthlyBarChart({ data }: { data: MonthlyRow[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -190,6 +177,7 @@ export default function SummaryPage() {
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(true);
   const [chartReady, setChartReady] = useState(false);
+  const [tab, setTab] = useState<"budget" | "breakdown">("budget");
   const router = useRouter();
 
   useEffect(() => {
@@ -211,13 +199,6 @@ export default function SummaryPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  // 達成率は「経過月（期首〜当月）の予算」に対して見る。通期予算で割ると期の途中では必ず低く出る
-  const achieveRate = data && data.budgetElapsed > 0
-    ? Math.round((data.totalFee / data.budgetElapsed) * 100)
-    : 0;
-  const achieveRateFy = data && data.budgetTotal > 0
-    ? Math.round((data.totalFee / data.budgetTotal) * 100)
-    : 0;
   const avgUnit = data && data.funeralCount > 0
     ? Math.round(data.funeralFee / data.funeralCount)
     : 0;
@@ -254,31 +235,31 @@ export default function SummaryPage() {
 
         {data && (
           <>
-            {/* KPIカード（iOS統一デザイン） */}
-            <div className="kpi-grid" style={{ marginBottom: 20 }}>
-              <KpiCard
-                label="累計予算（10月〜当月）"
-                value={data.budgetElapsed.toLocaleString()}
-                unit="千円"
-                sub={`通期予算 ${data.budgetTotal.toLocaleString()}千円`}
-              />
-              <KpiCard
-                label="累計手数料合計（確定）"
-                value={data.totalFee.toLocaleString()}
-                unit="千円"
-                sub={`10月〜${elapsedLabel}の確定分（葬儀執行済）　／　見込み（通期・9月まで）${data.totalPlanned.toLocaleString()}千円・${data.totalPlannedCount}件`}
-              />
-              <KpiCard
-                label="累計予算達成率"
-                value={`${achieveRate}%`}
-                sub={`10月〜${elapsedLabel}の予算に対して（通期比 ${achieveRateFy}%）`}
-              />
-              <KpiCard
-                label="累計件数"
-                value={data.totalCount.toLocaleString()}
-                unit="件"
-                sub={`葬儀＋法要 合計　／　平均手数料単価 ${avgUnit > 0 ? avgUnit.toLocaleString() : "—"}千円（葬儀系・法要除く・${data.kintonePeriodLabel} ${data.funeralCount}件）`}
-              />
+            {/* iOSセグメント風タブ。
+                2026-09-01 山崎さん指示：KPIカードは廃止し、予実と内訳をタブで分ける。
+                「予算実績」＝表1→グラフ→表2 の順。「内訳」＝手数料率・お布施・件数・葬法区分 */}
+            <div style={{ marginBottom: 20 }}>
+              <div className="pill-nav">
+                {([["budget", "01 予算実績"], ["breakdown", "02 内訳"]] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    className={`pill-tab ${tab === key ? "active" : ""}`}
+                    onClick={() => setTab(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {tab === "budget" && (
+              <>
+            <div className="card" style={{ marginBottom: 20 }}>
+              <div className="card-title">表1　月次 予算実績（確定分のみ）</div>
+              <div className="card-subtitle">
+                確定 = 葬儀日・法要日が今日以前。見込みは含めないので、月を締めたら動かない数字。単位：千円
+              </div>
+              <BudgetActualTable rows={budgetRows} />
             </div>
 
             {/* 月別グラフ */}
@@ -294,19 +275,6 @@ export default function SummaryPage() {
               )}
             </div>
 
-            {/* 月次 予算実績（表1・表2）
-                型は霊園DB・不動産DB・相続DBと共通（2026-08-26 山崎さん承認の正規版）。
-                components/BudgetTables.tsx をそのままコピーし、ここでは行データだけを組み立てる。
-                旧・月別詳細テーブルは予実と内訳（30%/40%/お布施/件数）が1表に混ざっており、
-                しかも見込み列が無かった。2026-09-01 に予実と内訳の2つに分けた */}
-            <div className="card" style={{ marginBottom: 20 }}>
-              <div className="card-title">表1　月次 予算実績（確定分のみ）</div>
-              <div className="card-subtitle">
-                確定 = 葬儀日・法要日が今日以前。見込みは含めないので、月を締めたら動かない数字。単位：千円
-              </div>
-              <BudgetActualTable rows={budgetRows} />
-            </div>
-
             <div className="card" style={{ marginBottom: 20 }}>
               <div className="card-title">表2　月次 着地見込み（実績＋見込）</div>
               <div className="card-subtitle">
@@ -314,7 +282,11 @@ export default function SummaryPage() {
               </div>
               <LandingForecastTable rows={budgetRows} />
             </div>
+              </>
+            )}
 
+            {tab === "breakdown" && (
+              <>
             {/* 内訳テーブル（予実から分離）。手数料率・お布施・件数はここで見る */}
             <div className="card" style={{ marginBottom: 20 }}>
               <div className="card-title">月別内訳（手数料率・お布施・件数）</div>
@@ -392,7 +364,13 @@ export default function SummaryPage() {
               {/* 区分別表 */}
               <div className="card">
                 <div className="card-title">葬法区分別手数料（{data.kintonePeriodLabel}）</div>
-                <div className="card-subtitle">Kintone連携データのみ集計</div>
+                <div className="card-subtitle">
+                  Kintone連携データのみ集計　／　葬儀系の平均手数料単価 {avgUnit > 0 ? avgUnit.toLocaleString() : "—"}千円（法要除く・{data.funeralCount}件）
+                </div>
+                <div className="card-subtitle" style={{ marginTop: 6 }}>
+                  「葬儀（旧区分）」は2026年8月より前に登録された分です。当時は二日葬・一日葬に分けていなかったため、
+                  どちらだったかはKintoneに記録がありません。8月以降の登録分だけが二日葬・一日葬に分かれます。
+                </div>
                 {Object.keys(data.feeByCategory).length === 0 ? (
                   <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>Kintoneデータなし</p>
                 ) : (
@@ -410,7 +388,9 @@ export default function SummaryPage() {
                         const catTotal = entries.reduce((s,[,v]) => s + v, 0);
                         return entries.map(([name, fee]) => (
                           <tr key={name}>
-                            <td style={{ fontWeight: 500 }}>{name}</td>
+                            {/* 「葬儀」は2026年8月に廃止された旧区分。二日葬・一日葬と並べると
+                                第3の葬法があるように見えてしまうので、ラベルで区別する */}
+                            <td style={{ fontWeight: 500 }}>{name === "葬儀" ? "葬儀（旧区分）" : name}</td>
                             <td style={{ fontWeight: 700, color: "var(--color-text)" }}>{fee.toLocaleString()}</td>
                             <td style={{ color: "var(--color-text-sub)" }}>
                               {catTotal > 0 ? `${Math.round(fee / catTotal * 100)}%` : "—"}
@@ -430,6 +410,8 @@ export default function SummaryPage() {
                 )}
               </div>
             </div>
+              </>
+            )}
           </>
         )}
       </div>
