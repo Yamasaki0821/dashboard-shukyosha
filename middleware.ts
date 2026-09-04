@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifySession } from "./lib/session";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 認証不要のパス
@@ -14,8 +15,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const user = request.cookies.get("auth_user");
-  if (!user) {
+  // 2026-09-04：cookieの「有無」ではなく「署名」を検証する。
+  // 以前は auth_user=任意 で誰でも突破できた（本人が本番で実証）。
+  const secret = process.env.AUTH_SECRET;
+  const token = request.cookies.get("auth_session")?.value;
+  const name = secret ? await verifySession(token, secret) : null;
+
+  if (!name) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);

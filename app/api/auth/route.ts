@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createSession } from "../../../lib/session";
 
 export async function POST(req: NextRequest) {
   const { name, password } = await req.json();
@@ -18,8 +19,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "名前またはパスワードが違います" }, { status: 401 });
   }
 
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    return NextResponse.json({ error: "設定エラー(AUTH_SECRET未設定)" }, { status: 500 });
+  }
+  const token = await createSession(name, secret);
+
   const res = NextResponse.json({ ok: true, name });
-  res.cookies.set("auth_user", name, {
+  res.cookies.set("auth_session", token, {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
