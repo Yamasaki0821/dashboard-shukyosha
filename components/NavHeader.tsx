@@ -10,6 +10,7 @@ const NAV = [
   { href: '/',             label: 'サマリー'       },
   { href: '/hall',         label: '事業部・会館'   },
   { href: '/denomination', label: '宗派・宗教者'   },
+  { href: '/report',       label: 'レポート'       },
 ];
 
 export default function NavHeader() {
