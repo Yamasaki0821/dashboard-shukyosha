@@ -6,31 +6,37 @@ import { NextRequest, NextResponse } from "next/server";
 import * as fs from "fs";
 import * as path from "path";
 import { fetchAllKintoneRecords, str, num, toYM } from "../../../lib/kintone";
+// 期の定義は lib/fiscalYear.ts が唯一の正。ここに日付や月リストを直書きしない（2026-09-04）
+import { type FiscalYear, fyMonths, fyStart, fyEnd, fyLabelLong, parseFiscalYear } from "../../../lib/fiscalYear";
 
-// ── 期の定義（第30期）───────────────────────────────────────────
-// 期が変わったらこの3つだけ直す
-const FY_START = "2025-10";           // 期首
-const FY_END   = "2026-09";           // 期末
-const FY_END_DATE = "2026-09-30";     // 期末の末日
-const CSV_LAST = "2026-03";           // CSV（Excel集計）が担当する最終月。これより後はKintoneを採用
-
-// ── 予算（千円単位） ────────────────────────────────────────────
-const BUDGET: Record<string, number> = {
-  "2025-10": 16073,
-  "2025-11": 17408,
-  "2025-12": 19597,
-  "2026-01": 23685,
-  "2026-02": 19156,
-  "2026-03": 18824,
-  "2026-04": 18709,
-  "2026-05": 17336,
-  "2026-06": 15923,
-  "2026-07": 17101,
-  "2026-08": 15229,
-  "2026-09": 15747,
+/**
+ * 月別の売上予算（千円）。期首（10月）から12か月ぶんを順に並べる。
+ *
+ * 第30期：10〜6月は確定値、7〜9月は10〜6月の平均で暫定（当時Excelが未確定だった）
+ * 第31期：出典 D:\②予算\第31期\部門内訳表\【228】メモリアルサービス課.xlsx
+ *         「経営計画書」26行 紹介手数料。通期 210,524千円
+ *
+ * ⚠ 社外秘。このAPIは認証の内側にある。クライアントのバンドルに直書きしない。
+ */
+const BUDGET_BY_FY: Record<FiscalYear, number[]> = {
+  30: [16073, 17408, 19597, 23685, 19156, 18824, 18709, 17336, 15923, 17101, 15229, 15747],
+  31: [17777, 17600, 18058, 19617, 15416, 18365, 19181, 17577, 16227, 16902, 16902, 16902],
 };
 
-const MONTHS_ORDER = Object.keys(BUDGET);
+/**
+ * CSV（Excel集計）が担当する最終月。これより後の月はKintoneを採用する。
+ *
+ * 第30期だけの事情：期の前半（〜2026-03）はKintoneに入力が無く、Excel集計のCSVしか無い。
+ * 第31期はすべてKintoneなので、CSVを一切採用しない値を返す（全月がこれより後になる）。
+ */
+function csvLastMonth(fy: FiscalYear): string {
+  return usesCsv(fy) ? "2026-03" : "0000-00";
+}
+
+/** その期がCSV（Excel集計）を使うか。第30期だけ。 */
+function usesCsv(fy: FiscalYear): boolean {
+  return fy === 30;
+}
 
 // 日本時間の「今月」（サーバーがUTCでも当月がズレないように+9時間）
 function currentYMJst(): string {
@@ -144,6 +150,10 @@ function readCSV(filename: string): Record<string, string>[] {
 }
 
 // 月名 → YYYY-MM 変換
+/**
+ * CSVの「10月」表記を年月へ。CSVは第30期のExcel集計だけなので、年は第30期に固定でよい。
+ * 第31期以降はCSVを一切採用しない（csvLastMonth が "0000-00" を返し、全行が除外される）。
+ */
 function csvMonthToYM(month: string): string | null {
   const m = month.replace("月", "");
   const n = parseInt(m, 10);
@@ -153,20 +163,34 @@ function csvMonthToYM(month: string): string | null {
   return null;
 }
 
-// ── Kintone クエリ（期全体を取得し、集計側でCSV期間を除外する）──
-const KINTONE_QUERY = `葬儀日_法要日 >= "${FY_START}-01" and 葬儀日_法要日 <= "${FY_END_DATE}"`;
-
 const yen = (v: number) => Math.round(v);          // 円は整数で持つ
 const toK = (v: number) => Math.round(v / 1000);   // 千円へは最後に1回だけ丸める
 
 // ── メイン GET ───────────────────────────────────────────────────
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const type = req.nextUrl.searchParams.get("type") ?? "summary";
+  const fy = parseFiscalYear(req.nextUrl.searchParams.get("fy"));
+
+  // 期に関わる値はすべてここで組み立てる。モジュール直下に置かない（期ごとに変わるため）
+  const MONTHS_ORDER = fyMonths(fy);
+  const FY_START     = MONTHS_ORDER[0];
+  const FY_END       = MONTHS_ORDER[MONTHS_ORDER.length - 1];
+  const FY_END_DATE  = fyEnd(fy);
+  const CSV_LAST     = csvLastMonth(fy);
+  const useCsvThisFy = usesCsv(fy);
+  const BUDGET: Record<string, number> = Object.fromEntries(
+    MONTHS_ORDER.map((m, i) => [m, BUDGET_BY_FY[fy][i]])
+  );
+  // 期全体を取得し、集計側でCSV期間を除外する
+  const KINTONE_QUERY = `葬儀日_法要日 >= "${fyStart(fy)}" and 葬儀日_法要日 <= "${FY_END_DATE}"`;
 
   try {
-    const csvMonthly = readCSV("集計_月別手数料率別.csv");
-    const csvDenom   = readCSV("集計_宗派別.csv");
-    const csvHall    = readCSV("集計_会館別.csv");
+    // ⚠ 集計_宗派別.csv と 集計_会館別.csv には月の列が無く、第30期の通期集計そのもの。
+    //   月で切れないので、CSVを使わない期では**そもそも読まない**。
+    //   読んでしまうと第31期の会館別・宗派別に第30期の数字が丸ごと混ざる（2026-09-04）。
+    const csvMonthly = useCsvThisFy ? readCSV("集計_月別手数料率別.csv") : [];
+    const csvDenom   = useCsvThisFy ? readCSV("集計_宗派別.csv") : [];
+    const csvHall    = useCsvThisFy ? readCSV("集計_会館別.csv") : [];
 
     let kintoneRecords: Awaited<ReturnType<typeof fetchAllKintoneRecords>> = [];
     try {
@@ -276,6 +300,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           // 見込み（葬儀日が未来のもの）。total には含めない
           planned:      toK(pl.total),
           plannedCount: pl.count,
+          // その月のデータがKintone由来か（第30期の前半だけExcel集計のCSV由来）。
+          // 画面が "2026-04" のような境界を直書きしなくて済むよう、APIが持つ（2026-09-04）
+          isKintone: isKintonePeriod,
           donation: isKintonePeriod ? toK(kt.donation) : null,
           count:    csv.count + kt.count,
           budget:   BUDGET[ym] ?? 0,
@@ -317,11 +344,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const funeralFee   = toK(funeral.reduce((s, r) => s + r.fee, 0));
 
       return NextResponse.json({
+        fiscalYear: fy, period: fyLabelLong(fy),
         monthly, totalFee, totalDonation, totalCount,
         totalPlanned, totalPlannedCount,
         budgetTotal, budgetElapsed, elapsedMonth,
         feeByRate, feeByCategory, funeralCount, funeralFee,
         kintonePeriodLabel,
+        // 期の中でCSVとKintoneが混在しているか。falseなら画面は出どころのバッジを出さない
+        mixedSources: useCsvThisFy,
       });
     }
 
@@ -379,6 +409,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         }));
 
       return NextResponse.json({
+        fiscalYear: fy, period: fyLabelLong(fy),
         byHall,
         byBranch: mapToArray(brMap),
         byAreaMonthly,
@@ -444,6 +475,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         }));
 
       return NextResponse.json({
+        fiscalYear: fy, period: fyLabelLong(fy),
         byDenomination,
         byOfficiantMonthly,
         kintoneMonths,

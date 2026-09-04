@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import NavHeader from "../components/NavHeader";
+import { isFutureFiscalYear, monthLabel, fyLabel, fyStartLabel, FISCAL_YEARS } from '../lib/fiscalYear';
+import { useFiscalYear } from '../lib/useFiscalYear';
 import { BudgetActualTable, LandingForecastTable, type BudgetRow } from "../components/BudgetTables";
 
 interface MonthlyRow {
@@ -16,6 +18,7 @@ interface MonthlyRow {
   donation: number | null;
   count: number;
   budget: number;
+  isKintone: boolean;   // その月のデータがKintone由来か（第30期の前半だけCSV由来）
 }
 
 interface SummaryData {
@@ -33,14 +36,10 @@ interface SummaryData {
   funeralCount: number;
   funeralFee: number;
   kintonePeriodLabel: string;
+  mixedSources: boolean;   // CSVとKintoneが混在する期か（第30期のみ true）
 }
 
-const MONTH_LABELS: Record<string, string> = {
-  "2025-10": "10月", "2025-11": "11月", "2025-12": "12月",
-  "2026-01": "1月",  "2026-02": "2月",  "2026-03": "3月",
-  "2026-04": "4月",  "2026-05": "5月",  "2026-06": "6月",
-  "2026-07": "7月",  "2026-08": "8月",  "2026-09": "9月",
-};
+// 月の見出しは lib/fiscalYear.ts の monthLabel() を使う。期ごとの対応表は持たない（2026-09-04）
 
 
 // 月別棒グラフ
@@ -54,7 +53,7 @@ function MonthlyBarChart({ data }: { data: MonthlyRow[] }) {
     if (!w.Chart) return;
     if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
 
-    const labels  = data.map(d => MONTH_LABELS[d.month] ?? d.month);
+    const labels  = data.map(d => monthLabel(d.month));
     const fee30   = data.map(d => d.fee30);
     const fee40   = data.map(d => d.fee40);
     const feeOther = data.map(d => d.feeOther);
@@ -179,6 +178,9 @@ export default function SummaryPage() {
   const [chartReady, setChartReady] = useState(false);
   const [tab, setTab] = useState<"budget" | "breakdown">("budget");
   const router = useRouter();
+  // 表示中の会計期はURLの ?fy= が正。ready になるまで取りに行かない（2回取るのを防ぐ）
+  const { fy, ready: fyReady } = useFiscalYear();
+  const futureFy = isFutureFiscalYear(fy);
 
   useEffect(() => {
     if ((window as any).Chart) { setChartReady(true); return; }
@@ -189,7 +191,9 @@ export default function SummaryPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/actuals?type=summary")
+    if (!fyReady) return;
+    setLoading(true);
+    fetch(`/api/actuals?type=summary&fy=${fy}`)
       .then(r => {
         if (r.status === 401) { router.push("/login"); return null; }
         return r.json();
@@ -197,7 +201,7 @@ export default function SummaryPage() {
       .then(d => { if (d) setData(d); })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, fy, fyReady]);
 
   const avgUnit = data && data.funeralCount > 0
     ? Math.round(data.funeralFee / data.funeralCount)
@@ -218,7 +222,7 @@ export default function SummaryPage() {
    */
   const budgetRows: BudgetRow[] = data
     ? data.monthly.map(m => ({
-        label: MONTH_LABELS[m.month] ?? m.month,
+        label: monthLabel(m.month),
         budget: m.budget,
         confirmed: m.month > data.elapsedMonth ? null : m.total,
         forecast: m.planned,
@@ -230,6 +234,22 @@ export default function SummaryPage() {
       <NavHeader />
 
       <div className="page-inner">
+        {/* まだ始まっていない期は実績が0で当たり前。
+            「壊れているのか、これからなのか」を画面に書く（2026-09-04 山崎さん指摘） */}
+        {futureFy && !loading && (
+          <div style={{
+            background: 'var(--color-warning-light)', border: '0.5px solid var(--color-warning)',
+            borderRadius: 'var(--radius)', padding: '16px 20px', marginBottom: 20,
+          }}>
+            <div style={{ fontSize: 'var(--fs-heading)', fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>
+              {fyLabel(fy)}は{fyStartLabel(fy)}に始まります。実績はまだ1件もありません
+            </div>
+            <div className="section-note" style={{ marginTop: 0 }}>
+              いま表示されている0は、集計が壊れているのではなく、対象期間がこれから始まるためです。
+              過去の数字を見るときは、上の「{fyLabel(FISCAL_YEARS[0])}」に切り替えてください。
+            </div>
+          </div>
+        )}
         {loading && <p style={{ color: "var(--color-text-muted)" }}>読み込み中...</p>}
         {error   && <p style={{ color: "var(--color-red)" }}>エラー: {error}</p>}
 
@@ -306,12 +326,13 @@ export default function SummaryPage() {
                   </thead>
                   <tbody>
                     {data.monthly.map((m) => {
-                      const isKintone = m.month >= "2026-04";
+                      // 出どころの表示はAPIの判定に従う。CSVを使わない期はバッジ自体を出さない
+                      const isKintone = m.isKintone;
                       return (
                         <tr key={m.month}>
                           <td>
-                            {MONTH_LABELS[m.month] ?? m.month}
-                            {isKintone && <span className="badge badge-kintone">Kintone</span>}
+                            {monthLabel(m.month)}
+                            {data.mixedSources && isKintone && <span className="badge badge-kintone">Kintone</span>}
                           </td>
                           <td>{m.fee30.toLocaleString()}</td>
                           <td>{m.fee40.toLocaleString()}</td>

@@ -2,10 +2,10 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { fetchAllKintoneRecords, str } from "../../../lib/kintone";
-
-const KINTONE_QUERY = '葬儀日_法要日 >= "2025-10-01" and 葬儀日_法要日 <= "2026-09-30"';
+// 期の定義は lib/fiscalYear.ts が唯一の正（2026-09-04）
+import { fyStart, fyEnd, fyLabelLong, parseFiscalYear } from "../../../lib/fiscalYear";
 
 // 文字化けの原因となる文字コード範囲
 // 参考: 一般的な日本語文字は以下のいずれか
@@ -68,8 +68,10 @@ function findSuspiciousChars(text: string): { char: string; codePoint: string; r
   return results;
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
+    const fy = parseFiscalYear(req.nextUrl.searchParams.get("fy"));
+    const KINTONE_QUERY = `葬儀日_法要日 >= "${fyStart(fy)}" and 葬儀日_法要日 <= "${fyEnd(fy)}"`;
     const records = await fetchAllKintoneRecords(KINTONE_QUERY);
     const suspects: Array<{
       recordId: string;

@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+// 期の定義は lib/fiscalYear.ts が唯一の正。ここに「第30期」等を直書きしない（2026-09-04）
+import { FISCAL_YEARS, isFutureFiscalYear, fyLabel, fyLabelLong } from '../lib/fiscalYear';
+import { useFiscalYear, fyHref } from '../lib/useFiscalYear';
 
 const NAV = [
   { href: '/',             label: 'サマリー'       },
@@ -12,6 +15,8 @@ const NAV = [
 export default function NavHeader() {
   const pathname = usePathname();
   const router = useRouter();
+  const { fy } = useFiscalYear();
+  const futureFy = isFutureFiscalYear(fy);
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -59,6 +64,14 @@ export default function NavHeader() {
             宗教者紹介事業 Analytics
           </span>
           <span style={{ flex: 1 }} />
+          {/* どの期を見ているかは常に見えるところに置く。
+              2026-09-04：下までスクロールすると期が分からず、0が並ぶ理由を判断できなかった */}
+          <span style={{
+            fontSize: 15, fontWeight: 600, marginRight: 4,
+            color: futureFy ? 'var(--color-warning)' : 'var(--color-text-sub)',
+          }}>
+            {fyLabel(fy)}{futureFy ? '（未開始）' : ''}
+          </span>
           <button
             onClick={handleLogout}
             style={{
@@ -85,13 +98,28 @@ export default function NavHeader() {
             <span className="page-title-dot" />
             宗教者紹介事業 Analytics
           </h1>
-          <p className="page-subtitle">第30期（2025年10月〜2026年9月）</p>
+          <p className="page-subtitle">{fyLabelLong(fy)}</p>
+          {/* 期セレクタ。ページを移っても同じ期を見ていたいので、期はURLに持たせる。
+              Linkではなく <a> にして本当に読み込み直す（3ページとも取り直すため） */}
+          <div className="pill-tab-bar" style={{ marginBottom: 8 }}>
+            <nav className="pill-nav" aria-label="会計期の切替">
+              {FISCAL_YEARS.map((y) => (
+                <a
+                  key={y}
+                  href={fyHref(pathname, y)}
+                  className={`pill-tab ${fy === y ? 'active' : ''}`}
+                >
+                  {fyLabel(y)}
+                </a>
+              ))}
+            </nav>
+          </div>
           <div className="pill-tab-bar">
             <nav className="pill-nav">
               {NAV.map((n) => (
                 <Link
                   key={n.href}
-                  href={n.href}
+                  href={fyHref(n.href, fy)}
                   className={`pill-tab ${isActive(n.href) ? 'active' : ''}`}
                 >
                   {n.label}

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import NavHeader from "../../components/NavHeader";
+import { isFutureFiscalYear, monthLabel, fyLabel, fyStartLabel, FISCAL_YEARS } from '../../lib/fiscalYear';
+import { useFiscalYear } from '../../lib/useFiscalYear';
 
 interface DenomRow {
   name: string;
@@ -25,10 +27,7 @@ interface DenomData {
   kintoneMonths: string[];
 }
 
-const MONTH_LABELS: Record<string, string> = {
-  "2026-04": "4月", "2026-05": "5月", "2026-06": "6月",
-  "2026-07": "7月", "2026-08": "8月", "2026-09": "9月",
-};
+// 月の見出しは lib/fiscalYear.ts の monthLabel() を使う。期ごとの対応表は持たない（2026-09-04）
 
 function DenomTable({ rows }: { rows: DenomRow[] }) {
   const totalFee      = rows.reduce((s, r) => s + r.fee, 0);
@@ -90,7 +89,7 @@ function OfficiantMatrix({ rows, months }: { rows: OfficiantRow[]; months: strin
         <tr>
           <th>順位</th>
           <th>宗教者名・寺院名</th>
-          {months.map(m => <th key={m}>{MONTH_LABELS[m] ?? m}</th>)}
+          {months.map(m => <th key={m}>{monthLabel(m)}</th>)}
           <th>手数料合計</th>
           <th>件数</th>
         </tr>
@@ -127,9 +126,14 @@ export default function DenominationPage() {
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  // 表示中の会計期はURLの ?fy= が正。ready になるまで取りに行かない（2回取るのを防ぐ）
+  const { fy, ready: fyReady } = useFiscalYear();
+  const futureFy = isFutureFiscalYear(fy);
 
   useEffect(() => {
-    fetch("/api/actuals?type=denomination")
+    if (!fyReady) return;
+    setLoading(true);
+    fetch(`/api/actuals?type=denomination&fy=${fy}`)
       .then(r => {
         if (r.status === 401) { router.push("/login"); return null; }
         return r.json();
@@ -137,13 +141,29 @@ export default function DenominationPage() {
       .then(d => { if (d) setData(d); })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, fy, fyReady]);
 
   return (
     <>
       <NavHeader />
 
       <div className="page-inner">
+        {/* まだ始まっていない期は実績が0で当たり前。
+            「壊れているのか、これからなのか」を画面に書く（2026-09-04 山崎さん指摘） */}
+        {futureFy && !loading && (
+          <div style={{
+            background: 'var(--color-warning-light)', border: '0.5px solid var(--color-warning)',
+            borderRadius: 'var(--radius)', padding: '16px 20px', marginBottom: 20,
+          }}>
+            <div style={{ fontSize: 'var(--fs-heading)', fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>
+              {fyLabel(fy)}は{fyStartLabel(fy)}に始まります。実績はまだ1件もありません
+            </div>
+            <div className="section-note" style={{ marginTop: 0 }}>
+              いま表示されている0は、集計が壊れているのではなく、対象期間がこれから始まるためです。
+              過去の数字を見るときは、上の「{fyLabel(FISCAL_YEARS[0])}」に切り替えてください。
+            </div>
+          </div>
+        )}
         {loading && <p style={{ color: "var(--color-text-muted)" }}>読み込み中...</p>}
         {error   && <p style={{ color: "var(--color-red)" }}>エラー: {error}</p>}
 
