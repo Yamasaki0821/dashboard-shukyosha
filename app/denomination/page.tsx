@@ -22,6 +22,8 @@ interface OfficiantRow {
 }
 
 interface DenomData {
+  kintonePeriodLabel: string;
+  csvPeriodLabel: string | null;   // CSVを使わない期は null
   byDenomination: DenomRow[];
   byOfficiantMonthly: OfficiantRow[];
   kintoneMonths: string[];
@@ -173,7 +175,9 @@ export default function DenominationPage() {
             <div className="card" style={{ marginBottom: 20 }}>
               <div className="card-title">宗派別（お布施額・手数料・平均単価）</div>
               <div className="card-subtitle">
-                10月〜3月（Excel・手数料のみ）+ 4月〜9月（Kintone・お布施額含む）　／　平均お布施はKintone期間のみ
+                {data.csvPeriodLabel
+                  ? `${data.csvPeriodLabel}（Excel・手数料のみ）+ ${data.kintonePeriodLabel}（Kintone・お布施額含む）　／　平均お布施はKintone期間のみ`
+                  : `Kintone連携データ（${data.kintonePeriodLabel}）`}
               </div>
               <div style={{ overflowX: "auto" }}>
                 <DenomTable rows={data.byDenomination} />
@@ -184,7 +188,7 @@ export default function DenominationPage() {
             <div className="card">
               <div className="card-title">宗教者・寺院別 月別手数料</div>
               <div className="card-subtitle">
-                ※ Kintone連携データのみ（4月〜9月）。手数料合計順で全宗教者表示。単位：千円
+                {`※ Kintone連携データのみ（${data.kintonePeriodLabel}）。手数料合計順で全宗教者表示。単位：千円`}
               </div>
               {data.byOfficiantMonthly.length === 0 ? (
                 <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>データなし</p>

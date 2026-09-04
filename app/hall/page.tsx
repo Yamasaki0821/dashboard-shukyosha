@@ -16,6 +16,8 @@ interface AreaMonthlyRow {
 }
 
 interface HallData {
+  kintonePeriodLabel: string;
+  csvPeriodLabel: string | null;   // CSVを使わない期は null
   byHall: Row[];
   byBranch: Row[];
   byAreaMonthly: AreaMonthlyRow[];
@@ -182,7 +184,7 @@ export default function HallPage() {
             {data.byBranch.length > 0 && (
               <div className="card" style={{ marginBottom: 20 }}>
                 <div className="card-title">支社別（お布施額・手数料）</div>
-                <div className="card-subtitle">Kintone連携データ（4月〜9月）</div>
+                <div className="card-subtitle">{`Kintone連携データ（${data.kintonePeriodLabel}）`}</div>
                 <div style={{ overflowX: "auto" }}>
                   <Table rows={data.byBranch} label="支社名" showDonation />
                 </div>
@@ -193,7 +195,7 @@ export default function HallPage() {
             {data.byAreaMonthly.length > 0 && (
               <div className="card" style={{ marginBottom: 20 }}>
                 <div className="card-title">エリア別 月別 お布施額</div>
-                <div className="card-subtitle">Kintone連携データ（4月〜9月）　／　単位：千円</div>
+                <div className="card-subtitle">{`Kintone連携データ（${data.kintonePeriodLabel}）　／　単位：千円`}</div>
                 <div style={{ overflowX: "auto" }}>
                   <AreaMatrix rows={data.byAreaMonthly} months={data.kintoneMonths} metric="donation" />
                 </div>
@@ -204,7 +206,7 @@ export default function HallPage() {
             {data.byAreaMonthly.length > 0 && (
               <div className="card" style={{ marginBottom: 20 }}>
                 <div className="card-title">エリア別 月別 手数料</div>
-                <div className="card-subtitle">Kintone連携データ（4月〜9月）　／　単位：千円</div>
+                <div className="card-subtitle">{`Kintone連携データ（${data.kintonePeriodLabel}）　／　単位：千円`}</div>
                 <div style={{ overflowX: "auto" }}>
                   <AreaMatrix rows={data.byAreaMonthly} months={data.kintoneMonths} metric="fee" />
                 </div>
@@ -215,7 +217,9 @@ export default function HallPage() {
             <div className="card">
               <div className="card-title">会館別（お布施額・手数料）</div>
               <div className="card-subtitle">
-                10月〜3月（Excel・手数料のみ）+ 4月〜9月（Kintone・お布施額含む）　／　手数料順で全会館表示
+                {data.csvPeriodLabel
+                  ? `${data.csvPeriodLabel}（Excel・手数料のみ）+ ${data.kintonePeriodLabel}（Kintone・お布施額含む）　／　手数料順で全会館表示`
+                  : `Kintone連携データ（${data.kintonePeriodLabel}）　／　手数料順で全会館表示`}
               </div>
               <div style={{ overflowX: "auto" }}>
                 <Table rows={data.byHall} label="会館名" showDonation />

@@ -36,6 +36,7 @@ interface SummaryData {
   funeralCount: number;
   funeralFee: number;
   kintonePeriodLabel: string;
+  csvPeriodLabel: string | null;   // CSVを使わない期は null
   mixedSources: boolean;   // CSVとKintoneが混在する期か（第30期のみ true）
 }
 

@@ -233,6 +233,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     const kintoneMonths = MONTHS_ORDER.filter(m => m > CSV_LAST);
     const kintonePeriodLabel = `${parseInt(kintoneMonths[0].slice(5), 10)}月〜${parseInt(kintoneMonths[kintoneMonths.length - 1].slice(5), 10)}月`;
+    // CSVが担当する期間。CSVを使わない期は null（画面はExcelの話を一切出さない）
+    const csvMonths = MONTHS_ORDER.filter(m => m <= CSV_LAST);
+    const csvPeriodLabel = csvMonths.length
+      ? `${parseInt(csvMonths[0].slice(5), 10)}月〜${parseInt(csvMonths[csvMonths.length - 1].slice(5), 10)}月`
+      : null;
 
     // ══════════════════════════════════════════════════════════════
     // type=summary
@@ -350,6 +355,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         budgetTotal, budgetElapsed, elapsedMonth,
         feeByRate, feeByCategory, funeralCount, funeralFee,
         kintonePeriodLabel,
+        csvPeriodLabel,
         // 期の中でCSVとKintoneが混在しているか。falseなら画面は出どころのバッジを出さない
         mixedSources: useCsvThisFy,
       });
@@ -415,6 +421,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         byAreaMonthly,
         kintoneMonths,
         kintonePeriodLabel,
+        csvPeriodLabel,
       });
     }
 
@@ -480,6 +487,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         byOfficiantMonthly,
         kintoneMonths,
         kintonePeriodLabel,
+        csvPeriodLabel,
       });
     }
 
