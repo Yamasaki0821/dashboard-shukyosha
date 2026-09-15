@@ -41,7 +41,7 @@ export default function NavHeader() {
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          height: 56,
+          height: 72,
           display: 'flex',
           alignItems: 'center',
           padding: '0 22px',
@@ -58,17 +58,17 @@ export default function NavHeader() {
           }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'baseline', letterSpacing: '0.5px' }}>
-            <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)' }}>T</span>
-            <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-primary)', marginLeft: 1 }}>EAR</span>
+            <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text)' }}>T</span>
+            <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-primary)', marginLeft: 1 }}>EAR</span>
           </span>
-          <span style={{ fontSize: 17, fontWeight: 500, color: 'var(--color-text)', letterSpacing: '-0.005em' }}>
+          <span style={{ fontSize: 20, fontWeight: 500, color: 'var(--color-text)', letterSpacing: '-0.005em' }}>
             宗教者紹介事業 Analytics
           </span>
           <span style={{ flex: 1 }} />
           {/* どの期を見ているかは常に見えるところに置く。
               2026-09-04：下までスクロールすると期が分からず、0が並ぶ理由を判断できなかった */}
           <span style={{
-            fontSize: 15, fontWeight: 600, marginRight: 4,
+            fontSize: 17, fontWeight: 600, marginRight: 4,
             color: futureFy ? 'var(--color-warning)' : 'var(--color-text-sub)',
           }}>
             {fyLabel(fy)}{futureFy ? '（未開始）' : ''}
