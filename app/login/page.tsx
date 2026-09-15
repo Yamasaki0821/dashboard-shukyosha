@@ -52,10 +52,8 @@ function LoginForm() {
         boxShadow: "0 6px 24px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04)",
       }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ display: "inline-flex", alignItems: "baseline", letterSpacing: "0.5px" }}>
-            <span style={{ fontSize: 28, fontWeight: 700, color: "#1d1d1f" }}>T</span>
-            <span style={{ fontSize: 28, fontWeight: 700, color: "#0071e3", marginLeft: 1 }}>EAR</span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/tear-logo.svg" alt="TEAR" style={{ height: 40, width: "auto", display: "block", margin: "0 auto" }} />
           <div style={{ fontSize: 15, color: "#6e6e73", marginTop: 12, fontWeight: 500 }}>
             宗教者紹介事業 Dashboard
           </div>
