@@ -57,10 +57,10 @@ export default function NavHeader() {
             gap: 14,
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'baseline', letterSpacing: '0.5px' }}>
-            <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text)' }}>T</span>
-            <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-primary)', marginLeft: 1 }}>EAR</span>
-          </span>
+          {/* 会社ロゴ（2026-09-15 山崎さん指示：文字の TEAR をロゴに置き換え）。public/tear-logo.svg は
+              ティアロゴ.pdf から紫の部分だけを切り出したもの（背景透過） */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src='/tear-logo.svg' alt='TEAR' style={{ height: 28, width: 'auto', display: 'block' }} />
           <span style={{ flex: 1 }} />
           {/* どの期を見ているかは常に見えるところに置く。
               2026-09-04：下までスクロールすると期が分からず、0が並ぶ理由を判断できなかった */}
