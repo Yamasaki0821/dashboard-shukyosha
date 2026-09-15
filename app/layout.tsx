@@ -17,8 +17,8 @@ const notoJp = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: '宗教者紹介事業 Analytics | TEAR',
-  description: 'ティア 宗教者紹介事業 Analytics',
+  title: '宗教者紹介事業 Dashboard | TEAR',
+  description: 'ティア 宗教者紹介事業 Dashboard',
 };
 
 export const viewport: Viewport = {

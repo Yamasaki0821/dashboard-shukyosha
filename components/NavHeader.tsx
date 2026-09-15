@@ -61,9 +61,6 @@ export default function NavHeader() {
             <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text)' }}>T</span>
             <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-primary)', marginLeft: 1 }}>EAR</span>
           </span>
-          <span style={{ fontSize: 20, fontWeight: 500, color: 'var(--color-text)', letterSpacing: '-0.005em' }}>
-            宗教者紹介事業 Analytics
-          </span>
           <span style={{ flex: 1 }} />
           {/* どの期を見ているかは常に見えるところに置く。
               2026-09-04：下までスクロールすると期が分からず、0が並ぶ理由を判断できなかった */}
@@ -97,7 +94,7 @@ export default function NavHeader() {
         <div className="page-header-inner">
           <h1 className="page-title">
             <span className="page-title-dot" />
-            宗教者紹介事業 Analytics
+            宗教者紹介事業 Dashboard
           </h1>
           <p className="page-subtitle">{fyLabelLong(fy)}</p>
           {/* 期セレクタ。ページを移っても同じ期を見ていたいので、期はURLに持たせる。

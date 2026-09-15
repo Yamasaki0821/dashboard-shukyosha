@@ -57,7 +57,7 @@ function LoginForm() {
             <span style={{ fontSize: 28, fontWeight: 700, color: "#0071e3", marginLeft: 1 }}>EAR</span>
           </div>
           <div style={{ fontSize: 15, color: "#6e6e73", marginTop: 12, fontWeight: 500 }}>
-            宗教者紹介事業 Analytics
+            宗教者紹介事業 Dashboard
           </div>
         </div>
 
